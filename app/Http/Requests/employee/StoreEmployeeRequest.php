@@ -19,6 +19,8 @@ class StoreEmployeeRequest extends FormRequest
             'first_name' => 'required|string|max:120',
             'last_name' => 'nullable|string|max:120',
             'email' => 'required|email|unique:employees,email',
+            // Require a password for auto-linked user account
+            'password' => 'required|string|min:8',
             'phone' => 'nullable|string|max:30',
             'gender' => 'nullable|in:male,female,other',
             'date_of_birth' => 'nullable|date',
