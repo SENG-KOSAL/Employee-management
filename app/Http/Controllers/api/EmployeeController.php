@@ -69,10 +69,10 @@ class EmployeeController extends Controller
             $data['photo_path'] = $this->storePhoto($request->file('photo'), $data['employee_code'] ?? Str::random(8));
         }
 
-        // Generate random password for new user account
-        $generatedPassword = Str::random(12);
+        // Use provided password from request (validated)
+        $providedPassword = $data['password'];
 
-        return DB::transaction(function () use ($data, $generatedPassword) {
+        return DB::transaction(function () use ($data, $providedPassword) {
             // Create employee first
             $employee = Employee::create($data);
 
@@ -80,7 +80,7 @@ class EmployeeController extends Controller
             $user = User::create([
                 'name' => $employee->full_name,
                 'email' => $employee->email,
-                'password' => $generatedPassword,
+                'password' => $providedPassword,
                 'role' => 'employee',
                 'employee_id' => $employee->id,
             ]);
@@ -90,8 +90,7 @@ class EmployeeController extends Controller
             $response = $resource->toArray(request());
             $response['login_credentials'] = [
                 'email' => $user->email,
-                'password' => $generatedPassword,
-                'message' => 'User account created automatically. Share these credentials with the employee.',
+                'message' => 'User account created automatically using provided password.',
             ];
 
             return response()->json($response, 201);
