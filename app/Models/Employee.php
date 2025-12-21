@@ -21,9 +21,12 @@ class Employee extends Model
         'address',
         'department',
         'position',
+        'department_id',
+        'position_id',
         'start_date',
         'salary',
         'status',
+        'line_manager_id',
         'photo_path',
     ];
 
@@ -49,5 +52,32 @@ class Employee extends Model
     public function user()
     {
         return $this->hasOne(User::class, 'employee_id');
+    }
+
+    // Self-referential manager relationship
+    public function lineManager()
+    {
+        return $this->belongsTo(self::class, 'line_manager_id');
+    }
+
+    // Employees who report to this employee
+    public function directReports()
+    {
+        return $this->hasMany(self::class, 'line_manager_id');
+    }
+
+    public function attendances()
+    {
+        return $this->hasMany(Attendance::class);
+    }
+
+    public function leaveRequests()
+    {
+        return $this->hasMany(LeaveRequest::class);
+    }
+
+    public function leaveAllocations()
+    {
+        return $this->hasMany(LeaveAllocation::class);
     }
 }

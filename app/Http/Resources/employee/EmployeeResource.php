@@ -26,6 +26,14 @@ class EmployeeResource extends JsonResource
             'salary' => (float) $this->salary,
             'status' => $this->status,
             'photo_url' => $this->photo_url,
+            'user' => $this->whenLoaded('user', function () {
+                return [
+                    'id' => $this->user->id,
+                    'name' => $this->user->name,
+                    'email' => $this->user->email,
+                    'role' => $this->user->role,
+                ];
+            }),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

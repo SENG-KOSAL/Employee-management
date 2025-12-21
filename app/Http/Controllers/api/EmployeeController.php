@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Hash;
 
 class EmployeeController extends Controller
 {
@@ -71,22 +72,24 @@ class EmployeeController extends Controller
 
         // Use provided password from request (validated)
         $providedPassword = $data['password'];
+        $userName = $data['name'] ?? null;
+        $userRole = $data['role'] ?? 'employee';
 
-        return DB::transaction(function () use ($data, $providedPassword) {
+        return DB::transaction(function () use ($data, $providedPassword, $userName, $userRole) {
             // Create employee first
             $employee = Employee::create($data);
 
             // Auto-create user account for this employee
             $user = User::create([
-                'name' => $employee->full_name,
+                'name' => $userName ?: $employee->full_name,
                 'email' => $employee->email,
                 'password' => $providedPassword,
-                'role' => 'employee',
+                'role' => $userRole,
                 'employee_id' => $employee->id,
             ]);
 
             // Return employee resource with generated credentials
-            $resource = new EmployeeResource($employee);
+            $resource = new EmployeeResource($employee->load('user'));
             $response = $resource->toArray(request());
             $response['login_credentials'] = [
                 'email' => $user->email,
@@ -99,12 +102,26 @@ class EmployeeController extends Controller
 
     public function show(Employee $employee)
     {
-        return new EmployeeResource($employee);
+        return new EmployeeResource($employee->load('user'));
     }
 
     public function update(UpdateEmployeeRequest $request, Employee $employee)
     {
         $data = $request->validated();
+
+        $userData = [];
+        if (array_key_exists('name', $data)) {
+            $userData['name'] = $data['name'];
+            unset($data['name']);
+        }
+        if (array_key_exists('role', $data)) {
+            $userData['role'] = $data['role'];
+            unset($data['role']);
+        }
+        if (! empty($data['password'])) {
+            $userData['password'] = $data['password'];
+            unset($data['password']);
+        }
 
         if ($request->hasFile('photo')) {
             // delete old photo if exists
@@ -114,9 +131,34 @@ class EmployeeController extends Controller
             $data['photo_path'] = $this->storePhoto($request->file('photo'), $data['employee_code'] ?? $employee->employee_code);
         }
 
-        $employee->update($data);
+        return DB::transaction(function () use ($employee, $data, $userData) {
+            $employee->update($data);
 
-        return new EmployeeResource($employee);
+            // Keep linked user in sync (if exists)
+            $user = $employee->user;
+            if ($user) {
+                // If employee email changed and user email was tied to it, sync
+                if (array_key_exists('email', $data)) {
+                    $userData['email'] = $employee->email;
+                }
+                if (array_key_exists('password', $userData)) {
+                    $userData['password'] = Hash::make($userData['password']);
+                }
+                // Don't overwrite name with null
+                if (array_key_exists('name', $userData) && $userData['name'] === null) {
+                    unset($userData['name']);
+                }
+                // Don't overwrite role with null
+                if (array_key_exists('role', $userData) && $userData['role'] === null) {
+                    unset($userData['role']);
+                }
+                if (! empty($userData)) {
+                    $user->update($userData);
+                }
+            }
+
+            return new EmployeeResource($employee->load('user'));
+        });
     }
 
     public function destroy(Employee $employee)

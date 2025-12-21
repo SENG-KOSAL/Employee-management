@@ -168,18 +168,33 @@ class AttendanceController extends Controller
                 ->get();
         }
 
+        // $mapped = $results->map(function ($row) use ($tz) {
+        //     $periodUtc = Carbon::parse($row->period, 'UTC');
+        //     return [
+        //         'employee_id' => $row->employee_id,
+        //         'period' => $periodUtc->toDateString(),
+        //         'period_iso_local' => $periodUtc->setTimezone($tz)->toIso8601String(),
+        //         'timezone' => $tz,
+        //         'total_hours' => $row->total_hours !== null ? (float) $row->total_hours : null,
+        //         'overtime_hours' => $row->overtime_hours !== null ? (float) $row->overtime_hours : null,
+        //     ];
+        // });
+        $tz = 'Asia/Phnom_Penh';
+
         $mapped = $results->map(function ($row) use ($tz) {
-            $periodUtc = Carbon::parse($row->period, 'UTC');
+
+            $utc = Carbon::parse($row->period, 'UTC');
+            $local = $utc->setTimezone($tz);
+
             return [
                 'employee_id' => $row->employee_id,
-                'period' => $periodUtc->toDateString(),
-                'period_iso_local' => $periodUtc->setTimezone($tz)->toIso8601String(),
+                'period' => $local->format('Y-m-d H:i:s'),
+                'period_iso_local' => $local->toIso8601String(),
                 'timezone' => $tz,
-                'total_hours' => $row->total_hours !== null ? (float) $row->total_hours : null,
-                'overtime_hours' => $row->overtime_hours !== null ? (float) $row->overtime_hours : null,
+                'total_hours' => (float) $row->total_hours,
+                'overtime_hours' => (float) $row->overtime_hours,
             ];
         });
-
         return response()->json($mapped);
     }
 
