@@ -7,6 +7,9 @@ use App\Http\Controllers\Api\LeaveApprovalController;
 use App\Http\Controllers\Api\LeaveRequestController;
 use App\Http\Controllers\Api\LeaveTypeController;
 use App\Http\Controllers\Api\DepartmentController;
+use App\Http\Controllers\Api\EmployeeBenefitController;
+use App\Http\Controllers\Api\EmployeeDeductionController;
+use App\Http\Controllers\Api\SalaryController;
 use Illuminate\Support\Facades\Route;
 
 // Public auth routes
@@ -50,4 +53,9 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::put('departments/{department}', [DepartmentController::class, 'update']);
     Route::patch('departments/{department}', [DepartmentController::class, 'update']);
     Route::delete('departments/{department}', [DepartmentController::class, 'destroy']);
+
+    // Salary management
+    Route::apiResource('employee-benefits', EmployeeBenefitController::class);
+    Route::apiResource('employee-deductions', EmployeeDeductionController::class);
+    Route::get('salary/{employee}', [SalaryController::class, 'show']);
 });
