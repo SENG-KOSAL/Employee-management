@@ -23,6 +23,7 @@ class Employee extends Model
         'position',
         'department_id',
         'position_id',
+        'base_salary',
         'start_date',
         'salary',
         'status',
@@ -33,6 +34,7 @@ class Employee extends Model
     protected $casts = [
         'date_of_birth' => 'date',
         'start_date' => 'date',
+        'base_salary' => 'decimal:2',
         'salary' => 'decimal:2',
     ];
 
@@ -79,5 +81,15 @@ class Employee extends Model
     public function leaveAllocations()
     {
         return $this->hasMany(LeaveAllocation::class);
+    }
+
+    public function benefits()
+    {
+        return $this->hasMany(EmployeeBenefit::class);
+    }
+
+    public function deductions()
+    {
+        return $this->hasMany(EmployeeDeduction::class);
     }
 }
