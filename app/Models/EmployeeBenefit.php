@@ -10,7 +10,7 @@ class EmployeeBenefit extends Model
     use HasFactory;
 
     protected $fillable = [
-        // 'employee_id',
+        'employee_id',
         'benefit_name',
         'amount',
         'type',

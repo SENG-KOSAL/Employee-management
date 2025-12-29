@@ -10,7 +10,7 @@ class EmployeeDeduction extends Model
     use HasFactory;
 
     protected $fillable = [
-        // 'employee_id',
+        'employee_id',
         'deduction_name',
         'amount',
         'type',

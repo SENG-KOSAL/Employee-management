@@ -66,6 +66,7 @@ class EmployeeBenefitController extends Controller
             'benefit_name' => 'sometimes|required|string|max:191',
             'amount' => 'sometimes|required|numeric|min:0',
             'type' => 'sometimes|required|in:fixed,percentage',
+            'employee_id' => 'sometimes|nullable|exists:employees,id',
         ]);
         $employeeBenefit->update($data);
         return $employeeBenefit->fresh('employee');
