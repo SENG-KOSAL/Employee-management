@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\LeaveApprovalController;
 use App\Http\Controllers\Api\LeaveRequestController;
 use App\Http\Controllers\Api\LeaveTypeController;
+use App\Http\Controllers\Api\LeaveAllocationController;
 use App\Http\Controllers\Api\DepartmentController;
 use App\Http\Controllers\Api\EmployeeBenefitController;
 use App\Http\Controllers\Api\EmployeeDeductionController;
@@ -57,5 +58,6 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     // Salary management
     Route::apiResource('employee-benefits', EmployeeBenefitController::class);
     Route::apiResource('employee-deductions', EmployeeDeductionController::class);
+    Route::apiResource('leave-allocations', LeaveAllocationController::class);
     Route::get('salary/{employee}', [SalaryController::class, 'show']);
 });
