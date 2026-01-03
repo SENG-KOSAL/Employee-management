@@ -11,6 +11,9 @@ use App\Http\Controllers\Api\DepartmentController;
 use App\Http\Controllers\Api\EmployeeBenefitController;
 use App\Http\Controllers\Api\EmployeeDeductionController;
 use App\Http\Controllers\Api\SalaryController;
+use App\Http\Controllers\Api\EmployeeWorkScheduleController;
+use App\Http\Controllers\Api\WorkScheduleController;
+use App\Http\Controllers\Api\OvertimeController;
 use Illuminate\Support\Facades\Route;
 
 // Public auth routes
@@ -59,5 +62,10 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::apiResource('employee-benefits', EmployeeBenefitController::class);
     Route::apiResource('employee-deductions', EmployeeDeductionController::class);
     Route::apiResource('leave-allocations', LeaveAllocationController::class);
+    Route::apiResource('work-schedules', WorkScheduleController::class);
+    Route::apiResource('employee-work-schedules', EmployeeWorkScheduleController::class)->only(['store', 'update', 'destroy']);
+    Route::apiResource('overtimes', OvertimeController::class);
+    Route::post('overtimes/{overtime}/approve', [OvertimeController::class, 'approve']);
+    Route::post('overtimes/{overtime}/reject', [OvertimeController::class, 'reject']);
     Route::get('salary/{employee}', [SalaryController::class, 'show']);
 });
