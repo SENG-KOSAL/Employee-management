@@ -8,6 +8,25 @@ use Illuminate\Http\Request;
 
 class EmployeeWorkScheduleController extends Controller
 {
+    public function index(Request $request)
+    {
+        $this->authorizeAdminHr();
+
+        $query = EmployeeWorkSchedule::with(['employee', 'workSchedule']);
+
+        if ($employeeId = $request->query('employee_id')) {
+            $query->where('employee_id', $employeeId);
+        }
+
+        return $query->orderByDesc('effective_from')->paginate((int) $request->query('per_page', 20));
+    }
+
+    public function show(EmployeeWorkSchedule $employeeWorkSchedule)
+    {
+        $this->authorizeAdminHr();
+        return $employeeWorkSchedule->load(['employee', 'workSchedule']);
+    }
+
     public function store(Request $request)
     {
         $this->authorizeAdminHr();

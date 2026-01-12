@@ -13,29 +13,28 @@ class SalaryController extends Controller
     public function show(Request $request, Employee $employee)
     {
         $user = $request->user();
-        if (! ($user->isAdmin() || $user->isHr() || ($user->employee && $user->employee->id === $employee->id))) {
+        if (! ($user->isAdmin() || $user->isHr())) {
             abort(403, 'Forbidden');
         }
 
         $from = $request->query('from');
         $to = $request->query('to');
 
+        $periodStart = $from ? Carbon::parse($from)->startOfDay() : now()->startOfMonth();
+        $periodEnd = $to ? Carbon::parse($to)->endOfDay() : now()->endOfMonth();
+
         $employee->load([
             'benefits',
             'deductions',
             'workScheduleAssignment.workSchedule',
-            'overtimes' => function ($q) use ($from, $to) {
+            'overtimes' => function ($q) use ($periodStart, $periodEnd) {
                 $q->where('status', 'approved');
-                if ($from) {
-                    $q->whereDate('work_date', '>=', $from);
-                }
-                if ($to) {
-                    $q->whereDate('work_date', '<=', $to);
-                }
+                $q->whereDate('work_date', '>=', $periodStart->toDateString());
+                $q->whereDate('work_date', '<=', $periodEnd->toDateString());
             },
         ]);
 
-        $summary = $this->calculateSalary($employee, $from, $to);
+        $summary = $this->calculateSalary($employee, $periodStart, $periodEnd);
 
         return response()->json([
             'employee_id' => $employee->id,
@@ -50,17 +49,14 @@ class SalaryController extends Controller
             'net_salary' => $summary['net_salary'],
             'breakdown' => $summary['breakdown'],
             'range' => [
-                'from' => $from,
-                'to' => $to,
+                'from' => $periodStart->toDateString(), 
+                'to' => $periodEnd->toDateString(),
             ],
         ]);
     }
 
-    protected function calculateSalary(Employee $employee, ?string $from, ?string $to): array
+    protected function calculateSalary(Employee $employee, Carbon $periodStart, Carbon $periodEnd): array
     {
-        $periodStart = $from ? Carbon::parse($from)->startOfDay() : now()->startOfMonth();
-        $periodEnd = $to ? Carbon::parse($to)->endOfDay() : now()->endOfMonth();
-
         $schedule = optional($employee->workScheduleAssignment)->workSchedule;
         $workingDays = $schedule?->working_days ?? ['mon', 'tue', 'wed', 'thu', 'fri'];
         $hoursPerDay = (float) ($schedule?->hours_per_day ?? 8);
@@ -154,3 +150,10 @@ class SalaryController extends Controller
         return $count;
     }
 }
+
+
+
+
+
+
+    

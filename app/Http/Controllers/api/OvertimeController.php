@@ -66,7 +66,7 @@ class OvertimeController extends Controller
             'employee_id' => 'nullable|exists:employees,id',
             'work_date' => 'required|date',
             'hours' => 'required|numeric|min:0.25',
-            'rate' => 'required|numeric|min:0',
+            'rate' => 'nullable|numeric|min:0',
             'notes' => 'nullable|string',
         ]);
 
@@ -79,6 +79,8 @@ class OvertimeController extends Controller
                 return response()->json(['message' => 'Forbidden'], 403);
             }
         }
+
+        $data['rate'] = $data['rate'] ?? 1; // default multiplier (1x)
 
         if ($isAdminOrHr) {
             $data['status'] = 'approved';
@@ -111,9 +113,13 @@ class OvertimeController extends Controller
         $data = $request->validate([
             'work_date' => 'sometimes|required|date',
             'hours' => 'sometimes|required|numeric|min:0.25',
-            'rate' => 'sometimes|required|numeric|min:0',
+            'rate' => 'sometimes|nullable|numeric|min:0',
             'notes' => 'nullable|string',
         ]);
+
+        if (array_key_exists('rate', $data) && $data['rate'] === null) {
+            $data['rate'] = 1; // normalize null to 1x
+        }
 
         $overtime->update($data);
         return $overtime->fresh(['employee', 'approver']);
