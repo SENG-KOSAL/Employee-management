@@ -44,3 +44,5 @@ class LeaveRequest extends Model
         return $this->belongsTo(\App\Models\User::class, 'approver_id');
     }
 }
+
+

@@ -116,8 +116,22 @@ class LeaveRequestController extends Controller
 
     public function show(LeaveRequest $leaveRequest)
     {
-        // Ensure 'view' policy for LeaveRequest is defined in AuthServiceProvider
-        $this->authorize('view', $leaveRequest);
+        $user = request()->user();
+
+        if ($user->isAdmin() || $user->isHr()) {
+            // allowed
+        } elseif ($user->isManager()) {
+            $managerEmployee = $user->employee;
+            if (! $managerEmployee || $leaveRequest->employee->line_manager_id !== $managerEmployee->id) {
+                abort(403, 'Forbidden');
+            }
+        } else {
+            // employee self only
+            if (! ($user->employee && $user->employee->id === $leaveRequest->employee_id)) {
+                abort(403, 'Forbidden');
+            }
+        }
+
         return new LeaveRequestResource($leaveRequest->load(['leaveType', 'employee', 'approver']));
     }
 

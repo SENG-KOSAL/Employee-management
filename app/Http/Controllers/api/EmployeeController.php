@@ -24,6 +24,11 @@ class EmployeeController extends Controller
 
     public function index(Request $request)
     {
+        $user = $request->user();
+        if ($user && $user->isEmployee()) {
+            abort(403, 'Employees cannot list other employees');
+        }
+
         $query = Employee::query();
 
         // Search (name, email, code)
@@ -102,11 +107,19 @@ class EmployeeController extends Controller
 
     public function show(Employee $employee)
     {
+        $user = request()->user();
+        if ($user && $user->isEmployee() && $user->employee_id !== $employee->id) {
+            abort(403, 'Forbidden');
+        }
         return new EmployeeResource($employee->load('user'));
     }
 
     public function update(UpdateEmployeeRequest $request, Employee $employee)
     {
+        $user = $request->user();
+        if ($user && $user->isEmployee() && $user->employee_id !== $employee->id) {
+            abort(403, 'Forbidden');
+        }
         $data = $request->validated();
 
         $userData = [];

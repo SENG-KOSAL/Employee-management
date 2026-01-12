@@ -115,6 +115,8 @@ class AttendanceController extends Controller
             $employee = $user->employee;
             if (! $employee) return response()->json(['message' => 'No linked employee'], 403);
             $query->where('employee_id', $employee->id);
+            // ignore provided employee_id to enforce self-only
+        }
         }
 
         // Pagination
