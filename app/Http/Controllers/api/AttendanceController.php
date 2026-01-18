@@ -117,7 +117,6 @@ class AttendanceController extends Controller
             $query->where('employee_id', $employee->id);
             // ignore provided employee_id to enforce self-only
         }
-        }
 
         // Pagination
         $perPage = (int) $request->query('per_page', 15);

@@ -10,6 +10,70 @@ use Illuminate\Http\Request;
 
 class SalaryController extends Controller
 {
+    public function index(Request $request)
+    {
+        $user = $request->user();
+        if (! ($user->isAdmin() || $user->isHr())) {
+            abort(403, 'Forbidden');
+        }
+
+        $from = $request->query('from');
+        $to = $request->query('to');
+
+        $periodStart = $from ? Carbon::parse($from)->startOfDay() : now()->startOfMonth();
+        $periodEnd = $to ? Carbon::parse($to)->endOfDay() : now()->endOfMonth();
+
+        $perPage = (int) $request->query('per_page', 15);
+
+        $employees = Employee::query()
+            ->with([
+                'benefits',
+                'deductions',
+                'workScheduleAssignment.workSchedule',
+                'overtimes' => function ($q) use ($periodStart, $periodEnd) {
+                    $q->where('status', 'approved');
+                    $q->whereDate('work_date', '>=', $periodStart->toDateString());
+                    $q->whereDate('work_date', '<=', $periodEnd->toDateString());
+                },
+            ])
+            ->orderBy('id', 'asc')
+            ->paginate($perPage)
+            ->withQueryString();
+
+        $items = $employees->getCollection()->map(function (Employee $employee) use ($periodStart, $periodEnd) {
+            $summary = $this->calculateSalary($employee, $periodStart, $periodEnd);
+
+            return [
+                'employee_id' => $employee->id,
+                'employee_code' => $employee->employee_code,
+                'full_name' => $employee->full_name,
+                'base_salary' => $summary['base_salary'],
+                'hourly_rate' => $summary['hourly_rate'],
+                'expected_working_days' => $summary['expected_working_days'],
+                'hours_per_day' => $summary['hours_per_day'],
+                'total_benefits' => $summary['total_benefits'],
+                'total_deductions' => $summary['total_deductions'],
+                'total_overtime' => $summary['total_overtime'],
+                'unpaid_leave_deduction' => $summary['unpaid_leave_deduction'],
+                'net_salary' => $summary['net_salary'],
+            ];
+        });
+
+        return response()->json([
+            'data' => $items,
+            'meta' => [
+                'current_page' => $employees->currentPage(),
+                'per_page' => $employees->perPage(),
+                'total' => $employees->total(),
+                'last_page' => $employees->lastPage(),
+            ],
+            'range' => [
+                'from' => $periodStart->toDateString(),
+                'to' => $periodEnd->toDateString(),
+            ],
+        ]);
+    }
+
     public function show(Request $request, Employee $employee)
     {
         $user = $request->user();

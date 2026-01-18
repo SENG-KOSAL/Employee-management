@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\SalaryController;
 use App\Http\Controllers\Api\EmployeeWorkScheduleController;
 use App\Http\Controllers\Api\WorkScheduleController;
 use App\Http\Controllers\Api\OvertimeController;
+use App\Http\Controllers\Api\PayrollRunController;
 use Illuminate\Support\Facades\Route;
 
 // Public auth routes
@@ -45,26 +46,18 @@ Route::prefix('v1')->group(function () {
     Route::post('leave-requests/{leave_request}/decide', [LeaveApprovalController::class, 'decide'])->middleware('auth:sanctum');
 });
 
-// Employee self-service routes
+// Employee self-service payrolls
 Route::prefix('v1')->middleware(['auth:sanctum', 'role:employee'])->group(function () {
-    // self attendance
-    Route::get('attendances', [AttendanceController::class, 'index']);
-    Route::get('attendances/summary', [AttendanceController::class, 'summary']);
-    // self leave requests
-    Route::get('leave-requests', [LeaveRequestController::class, 'index']);
-    Route::post('leave-requests', [LeaveRequestController::class, 'store']);
-    Route::get('leave-requests/{leave_request}', [LeaveRequestController::class, 'show']);
-    Route::post('leave-requests/{leave_request}/cancel', [LeaveRequestController::class, 'cancel']);
-    // self profile
-    Route::get('employees/{employee}', [EmployeeController::class, 'show']);
-    Route::put('employees/{employee}', [EmployeeController::class, 'update']);
-    Route::patch('employees/{employee}', [EmployeeController::class, 'update']);
+    Route::get('me/payrolls', [\App\Http\Controllers\Api\PayrollController::class, 'myPayrolls']);
 });
 
 // Protected routes (admin/hr/manager; further checks in controllers)
 Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::post('users', [AuthController::class, 'createUser'])->middleware('can:create-user');
     Route::apiResource('employees', EmployeeController::class);
+
+    
+
 
     // Department management (controller enforces role-based access)
     Route::get('departments', [DepartmentController::class, 'index']);
@@ -83,5 +76,21 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::apiResource('overtimes', OvertimeController::class);
     Route::post('overtimes/{overtime}/approve', [OvertimeController::class, 'approve']);
     Route::post('overtimes/{overtime}/reject', [OvertimeController::class, 'reject']);
+    // salary viewing
+    Route::get('salaries', [SalaryController::class, 'index']);
     Route::get('salary/{employee}', [SalaryController::class, 'show']);
+
+    // payroll management (admin/hr only enforced in controller; add role middleware if desired)
+    Route::get('payrolls', [\App\Http\Controllers\Api\PayrollController::class, 'index'])->middleware('role:admin,hr');
+    
+    Route::post('payrolls', [\App\Http\Controllers\Api\PayrollController::class, 'store'])->middleware('role:admin,hr');
+    Route::get('payrolls/{payroll}', [\App\Http\Controllers\Api\PayrollController::class, 'show'])->middleware('role:admin,hr');
+    Route::post('payrolls/{payroll}/mark-paid', [\App\Http\Controllers\Api\PayrollController::class, 'markPaid'])->middleware('role:admin,hr');
+
+    // payroll runs
+    Route::get('payroll-runs', [PayrollRunController::class, 'index'])->middleware('role:admin,hr');
+    Route::post('payroll-runs', [PayrollRunController::class, 'store'])->middleware('role:admin,hr');
+    Route::get('payroll-runs/{payroll_run}', [PayrollRunController::class, 'show'])->middleware('role:admin,hr');
+    Route::post('payroll-runs/{payroll_run}/approve', [PayrollRunController::class, 'approve'])->middleware('role:admin,hr');
+    Route::post('payroll-runs/{payroll_run}/mark-paid', [PayrollRunController::class, 'markPaid'])->middleware('role:admin,hr');
 });
