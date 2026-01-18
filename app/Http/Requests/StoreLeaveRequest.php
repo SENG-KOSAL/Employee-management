@@ -19,7 +19,8 @@ class StoreLeaveRequest extends FormRequest
             'leave_type_id' => 'required|exists:leave_types,id',
             'start_date' => 'required|date|before_or_equal:end_date',
             'end_date' => 'required|date|after_or_equal:start_date',
-            'days' => 'required|numeric|min:0.5',
+            // optional: will be auto-computed if omitted; allow half-day steps like 0.5, 1.5, 2.5
+            'days' => ['nullable', 'numeric', 'min:0.5', 'regex:/^\d+(\.5)?$/'],
             'reason' => 'nullable|string|max:2000',
         ];
     }
