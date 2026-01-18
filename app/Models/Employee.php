@@ -83,6 +83,28 @@ class Employee extends Model
         return $this->hasMany(LeaveAllocation::class);
     }
 
+    public function overtimes()
+    {
+        return $this->hasMany(Overtime::class);
+    }
+
+    public function workScheduleAssignment()
+    {
+        return $this->hasOne(EmployeeWorkSchedule::class);
+    }
+
+    public function workSchedule()
+    {
+        return $this->hasOneThrough(
+            WorkSchedule::class,
+            EmployeeWorkSchedule::class,
+            'employee_id',
+            'id',
+            'id',
+            'work_schedule_id'
+        );
+    }
+
     public function benefits()
     {
         return $this->hasMany(EmployeeBenefit::class);

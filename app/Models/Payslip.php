@@ -5,23 +5,22 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class EmployeeBenefit extends Model
+class Payslip extends Model
 {
     use HasFactory;
 
     protected $fillable = [
-        'employee_id',
-        'benefit_name',
-        'amount',
-        'type',
+        'payroll_id',
+        'file_path',
+        'generated_at',
     ];
 
     protected $casts = [
-        'amount' => 'decimal:2',
+        'generated_at' => 'datetime',
     ];
 
-    public function employee()
+    public function payroll()
     {
-        return $this->belongsTo(Employee::class);
+        return $this->belongsTo(Payroll::class);
     }
 }

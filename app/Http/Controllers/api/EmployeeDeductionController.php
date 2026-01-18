@@ -67,6 +67,7 @@ class EmployeeDeductionController extends Controller
             'amount' => 'sometimes|required|numeric|min:0',
             'type' => 'sometimes|required|in:fixed,percentage',
             'reason' => 'nullable|string',
+            'employee_id' => 'sometimes|nullable|exists:employees,id',
         ]);
         $employeeDeduction->update($data);
         return $employeeDeduction->fresh('employee');
