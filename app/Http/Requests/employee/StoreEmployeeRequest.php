@@ -35,6 +35,18 @@ class StoreEmployeeRequest extends FormRequest
             'salary' => 'nullable|numeric|min:0',
             'status' => 'nullable|in:active,inactive',
             'photo' => 'nullable|image|max:4096', // max 4MB
+
+            // National & Legal Information
+            'national_id_number' => 'nullable|string|max:50',
+            'nssf_number' => 'nullable|string|max:50',
+            'passport_number' => 'nullable|string|max:50',
+            'work_permit_number' => 'nullable|string|max:50',
+            'nationality' => 'nullable|in:khmer,foreign',
+
+            // Emergency Contact
+            'emergency_contact_name' => 'nullable|string|max:150',
+            'emergency_contact_phone' => 'nullable|string|max:30',
+            'emergency_contact_relationship' => 'nullable|string|max:50',
         ];
     }
 }

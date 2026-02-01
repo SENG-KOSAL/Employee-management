@@ -27,13 +27,50 @@ class LeaveApprovalController extends Controller
         }
 
         $data = $request->validated();
-        $action = $data['action'];
+        return $this->performDecision($leaveRequest, (string) $data['action'], $data['approver_notes'] ?? null, $user);
+    }
 
-        DB::transaction(function () use ($leaveRequest, $action, $data, $user) {
+    public function approve(Request $request, LeaveRequest $leaveRequest)
+    {
+        $user = $request->user();
+
+        if (! Gate::allows('approve-leave-for', $leaveRequest->employee)) {
+            return response()->json(['message' => 'You are not authorized to approve/reject this leave'], 403);
+        }
+
+        $data = $request->validate([
+            'approver_notes' => 'nullable|string|max:2000',
+        ]);
+
+        return $this->performDecision($leaveRequest, 'approve', $data['approver_notes'] ?? null, $user);
+    }
+
+    public function reject(Request $request, LeaveRequest $leaveRequest)
+    {
+        $user = $request->user();
+
+        if (! Gate::allows('approve-leave-for', $leaveRequest->employee)) {
+            return response()->json(['message' => 'You are not authorized to approve/reject this leave'], 403);
+        }
+
+        $data = $request->validate([
+            'approver_notes' => 'nullable|string|max:2000',
+        ]);
+
+        return $this->performDecision($leaveRequest, 'reject', $data['approver_notes'] ?? null, $user);
+    }
+
+    private function performDecision(LeaveRequest $leaveRequest, string $action, ?string $approverNotes, $user)
+    {
+        if ($leaveRequest->status !== 'pending') {
+            return response()->json(['message' => 'Leave already decided'], 400);
+        }
+
+        DB::transaction(function () use ($leaveRequest, $action, $approverNotes, $user) {
             if ($action === 'approve') {
                 $leaveRequest->status = 'approved';
                 $leaveRequest->approver_id = $user->id;
-                $leaveRequest->approver_notes = $data['approver_notes'] ?? null;
+                $leaveRequest->approver_notes = $approverNotes;
                 $leaveRequest->decided_at = Carbon::now();
                 $leaveRequest->save();
 
@@ -56,14 +93,12 @@ class LeaveApprovalController extends Controller
             } else { // reject
                 $leaveRequest->status = 'rejected';
                 $leaveRequest->approver_id = $user->id;
-                $leaveRequest->approver_notes = $data['approver_notes'] ?? null;
+                $leaveRequest->approver_notes = $approverNotes;
                 $leaveRequest->decided_at = Carbon::now();
                 $leaveRequest->save();
             }
-
-            // Optionally: send notifications to employee
         });
 
-        return new \App\Http\Resources\LeaveRequestResource($leaveRequest->fresh()->load(['employee','leaveType','approver']));
+        return new \App\Http\Resources\LeaveRequestResource($leaveRequest->fresh()->load(['employee', 'leaveType', 'approver']));
     }
 }

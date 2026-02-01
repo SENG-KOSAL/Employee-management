@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Employee;
 use App\Models\Payroll;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
@@ -49,7 +50,156 @@ class PayrollController extends Controller
             abort(403, 'Forbidden');
         }
 
-        return $payroll->load(['employee', 'payslip']);
+        return $payroll->load(['employee', 'payslip', 'adjustments', 'auditLogs.user']);
+    }
+
+    public function update(Request $request, Payroll $payroll)
+    {
+        $user = $request->user();
+        if (! ($user->isAdmin() || $user->isHr())) {
+            abort(403, 'Forbidden');
+        }
+
+        if ($payroll->status !== 'draft') {
+            abort(422, 'Only draft payroll can be edited');
+        }
+
+        $data = $request->validate([
+            'base_pay' => 'sometimes|numeric|min:0',
+            'overtime_pay' => 'sometimes|numeric|min:0',
+            'benefits_total' => 'sometimes|numeric|min:0',
+            'deductions_total' => 'sometimes|numeric|min:0',
+            'unpaid_leave_deduction' => 'sometimes|numeric|min:0',
+            'notes' => 'sometimes|nullable|string',
+        ]);
+
+        $trackedFields = [
+            'base_pay',
+            'overtime_pay',
+            'benefits_total',
+            'deductions_total',
+            'unpaid_leave_deduction',
+            'gross_pay',
+            'net_pay',
+            'notes',
+        ];
+
+        return DB::transaction(function () use ($payroll, $data, $user, $trackedFields) {
+            $before = $payroll->only($trackedFields);
+
+            foreach ($data as $key => $value) {
+                $payroll->{$key} = $value;
+            }
+
+            $basePay = (float) $payroll->base_pay;
+            $overtimePay = (float) $payroll->overtime_pay;
+            $benefitsTotal = (float) $payroll->benefits_total;
+            $deductionsTotal = (float) $payroll->deductions_total;
+            $unpaidLeaveDeduction = (float) $payroll->unpaid_leave_deduction;
+
+            $grossPay = $basePay + $overtimePay + $benefitsTotal;
+            $netPay = $grossPay - $deductionsTotal - $unpaidLeaveDeduction;
+
+            $payroll->gross_pay = $grossPay;
+            $payroll->net_pay = $netPay;
+            $payroll->save();
+
+            $after = $payroll->fresh()->only($trackedFields);
+
+            $payroll->auditLogs()->create([
+                'user_id' => $user->id,
+                'action' => 'edited',
+                'changes' => [
+                    'before' => $before,
+                    'after' => $after,
+                ],
+            ]);
+
+            return $payroll->fresh(['employee', 'adjustments', 'auditLogs.user']);
+        });
+    }
+
+    public function listAdjustments(Request $request, Payroll $payroll)
+    {
+        $user = $request->user();
+        if (! ($user->isAdmin() || $user->isHr())) {
+            abort(403, 'Forbidden');
+        }
+
+        return $payroll->adjustments()->orderByDesc('created_at')->get();
+    }
+
+    public function createAdjustment(Request $request, Payroll $payroll)
+    {
+        $user = $request->user();
+        if (! ($user->isAdmin() || $user->isHr())) {
+            abort(403, 'Forbidden');
+        }
+
+        if (! in_array($payroll->status, ['approved', 'paid'], true)) {
+            abort(422, 'Adjustments are allowed only for approved or paid payrolls');
+        }
+
+        $data = $request->validate([
+            'kind' => 'required|in:earning,deduction',
+            'amount' => 'required|numeric|min:0.01',
+            'description' => 'nullable|string|max:255',
+        ]);
+
+        $trackedFields = [
+            'benefits_total',
+            'deductions_total',
+            'gross_pay',
+            'net_pay',
+        ];
+
+        return DB::transaction(function () use ($payroll, $data, $user, $trackedFields) {
+            $before = $payroll->only($trackedFields);
+
+            $adjustment = $payroll->adjustments()->create([
+                'kind' => $data['kind'],
+                'amount' => $data['amount'],
+                'description' => $data['description'] ?? null,
+                'created_by' => $user->id,
+            ]);
+
+            $amount = (float) $adjustment->amount;
+            if ($adjustment->kind === 'earning') {
+                $payroll->benefits_total = (float) $payroll->benefits_total + $amount;
+            } else {
+                $payroll->deductions_total = (float) $payroll->deductions_total + $amount;
+            }
+
+            $basePay = (float) $payroll->base_pay;
+            $overtimePay = (float) $payroll->overtime_pay;
+            $benefitsTotal = (float) $payroll->benefits_total;
+            $deductionsTotal = (float) $payroll->deductions_total;
+            $unpaidLeaveDeduction = (float) $payroll->unpaid_leave_deduction;
+
+            $grossPay = $basePay + $overtimePay + $benefitsTotal;
+            $netPay = $grossPay - $deductionsTotal - $unpaidLeaveDeduction;
+
+            $payroll->gross_pay = $grossPay;
+            $payroll->net_pay = $netPay;
+            $payroll->save();
+
+            $after = $payroll->fresh()->only($trackedFields);
+
+            $payroll->auditLogs()->create([
+                'user_id' => $user->id,
+                'action' => 'adjustment_created',
+                'changes' => [
+                    'adjustment' => $adjustment->only(['id', 'kind', 'amount', 'description']),
+                    'before' => $before,
+                    'after' => $after,
+                ],
+            ]);
+
+            return response()->json([
+                'payroll' => $payroll->fresh(['employee', 'adjustments']),
+                'adjustment' => $adjustment->fresh(['creator']),
+            ], 201);
+        });
     }
 
     // Employee self: list own payrolls

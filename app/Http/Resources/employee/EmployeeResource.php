@@ -26,6 +26,28 @@ class EmployeeResource extends JsonResource
             'salary' => (float) $this->salary,
             'status' => $this->status,
             'photo_url' => $this->photo_url,
+
+            // National & Legal Information
+            'national_id_number' => $this->national_id_number,
+            'nssf_number' => $this->nssf_number,
+            'passport_number' => $this->passport_number,
+            'work_permit_number' => $this->work_permit_number,
+            'nationality' => $this->nationality,
+
+            // Emergency Contact
+            'emergency_contact_name' => $this->emergency_contact_name,
+            'emergency_contact_phone' => $this->emergency_contact_phone,
+            'emergency_contact_relationship' => $this->emergency_contact_relationship,
+
+            // Documents (separate table)
+            'documents' => $this->whenLoaded('document', function () {
+                return [
+                    'id_card_file_path' => $this->document?->id_card_file_path,
+                    'contract_file_path' => $this->document?->contract_file_path,
+                    'cv_file_path' => $this->document?->cv_file_path,
+                    'certificate_file_path' => $this->document?->certificate_file_path,
+                ];
+            }),
             'user' => $this->whenLoaded('user', function () {
                 return [
                     'id' => $this->user->id,
