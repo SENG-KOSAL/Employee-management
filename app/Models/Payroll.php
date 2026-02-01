@@ -54,4 +54,14 @@ class Payroll extends Model
     {
         return $this->hasOne(Payslip::class);
     }
+
+    public function adjustments()
+    {
+        return $this->hasMany(PayrollAdjustment::class);
+    }
+
+    public function auditLogs()
+    {
+        return $this->hasMany(PayrollAuditLog::class);
+    }
 }
