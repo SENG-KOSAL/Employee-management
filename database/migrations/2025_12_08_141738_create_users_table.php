@@ -19,9 +19,6 @@ return new class extends Migration
             $table->enum('role', ['admin','hr','manager','employee'])->default('employee')->index();
             $table->unsignedBigInteger('employee_id')->nullable()->index();
             $table->timestamps();
-
-            // Add FK if employees table exists
-            $table->foreign('employee_id')->references('id')->on('employees')->nullOnDelete();
         });
     }
 
@@ -30,12 +27,7 @@ return new class extends Migration
      * Reverse the migrations.
      */
     public function down(): void
-     {
-        Schema::table('users', function (Blueprint $table) {
-            if (Schema::hasColumn('users', 'employee_id')) {
-                $table->dropForeign(['employee_id']);
-            }
-        });
+    {
         Schema::dropIfExists('users');
     }
 };

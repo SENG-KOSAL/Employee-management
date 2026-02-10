@@ -11,15 +11,19 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('leave_types', function (Blueprint $table) {
-            $table->integer('default_days')->default(0)->after('description');
-        });
+        if (! Schema::hasColumn('leave_types', 'default_days')) {
+            Schema::table('leave_types', function (Blueprint $table) {
+                $table->integer('default_days')->default(0)->after('description');
+            });
+        }
     }
 
     public function down(): void
     {
-        Schema::table('leave_types', function (Blueprint $table) {
-            $table->dropColumn('default_days');
-        });
+        if (Schema::hasColumn('leave_types', 'default_days')) {
+            Schema::table('leave_types', function (Blueprint $table) {
+                $table->dropColumn('default_days');
+            });
+        }
     }
 };
