@@ -24,6 +24,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'role' => \App\Http\Middleware\RoleMiddleware::class,
             'permission' => \App\Http\Middleware\PermissionMiddleware::class,
+            'active-company' => \App\Http\Middleware\ResolveActiveCompany::class,
+            'require-company' => \App\Http\Middleware\EnforceActiveCompany::class,
+            'superadmin-readonly' => \App\Http\Middleware\SuperAdminReadOnly::class,
+            'audit' => \App\Http\Middleware\AuditTrail::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

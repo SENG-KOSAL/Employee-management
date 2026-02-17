@@ -80,7 +80,11 @@ class PayrollRunController extends Controller
         );
 
         DB::transaction(function () use ($run, $periodStart, $periodEnd) {
-            $employees = Employee::where('status', 'active')->orWhereNull('status')->get();
+            $employees = Employee::query()
+                ->where(function ($q) {
+                    $q->where('status', 'active')->orWhereNull('status');
+                })
+                ->get();
             foreach ($employees as $employee) {
                 $summary = $this->calculateSalary($employee, $periodStart, $periodEnd);
 
