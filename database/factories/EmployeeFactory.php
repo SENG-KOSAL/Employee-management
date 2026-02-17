@@ -12,8 +12,7 @@ class EmployeeFactory extends Factory
 
     public function definition(): array
     {
-        static $count = 1;
-        $code = 'EMP-' . str_pad($count++, 3, '0', STR_PAD_LEFT);
+        $code = $this->faker->unique()->numerify('EMP-#######');
 
         $nationality = $this->faker->randomElement(['khmer', 'foreign']);
         $passport = $nationality === 'foreign'

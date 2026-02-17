@@ -13,6 +13,40 @@ class UpdateEmployeeRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        if (! $this->has('status')) {
+            return;
+        }
+
+        $status = $this->input('status');
+
+        if (is_bool($status)) {
+            $status = $status ? 'active' : 'inactive';
+        } elseif (is_numeric($status)) {
+            $status = ((int) $status) === 1 ? 'active' : 'inactive';
+        }
+
+        if (is_string($status)) {
+            $normalized = strtolower(trim($status));
+            $map = [
+                'active' => 'active',
+                'inactive' => 'inactive',
+                'disabled' => 'inactive',
+                'suspended' => 'inactive',
+                'terminated' => 'inactive',
+            ];
+
+            if (array_key_exists($normalized, $map)) {
+                $status = $map[$normalized];
+            } else {
+                $status = $normalized;
+            }
+        }
+
+        $this->merge(['status' => $status]);
+    }
+
     public function rules(): array
     {
         $employeeParam = $this->route('employee');

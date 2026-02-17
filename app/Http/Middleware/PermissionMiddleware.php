@@ -16,7 +16,7 @@ class PermissionMiddleware
         }
 
         // Admin bypass (optional, but usually desired)
-        if (method_exists($user, 'isAdmin') && $user->isAdmin()) {
+        if ((method_exists($user, 'isSuperAdmin') && $user->isSuperAdmin()) || (method_exists($user, 'isAdmin') && $user->isAdmin())) {
             return $next($request);
         }
 
