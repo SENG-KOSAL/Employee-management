@@ -2,14 +2,16 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class LeaveAllocation extends Model
 {
     use HasFactory;
+    use BelongsToCompany;
 
-    protected $fillable = ['employee_id', 'leave_type_id', 'year', 'days_allocated', 'days_used'];
+    protected $fillable = ['company_id', 'employee_id', 'leave_type_id', 'year', 'days_allocated', 'days_used'];
 
     public function employee()
     {

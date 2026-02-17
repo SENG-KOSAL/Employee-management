@@ -12,9 +12,20 @@ class UserResource extends JsonResource
         return [
             'id' => $this->id,
             'name' => $this->name,
+            'username' => $this->username,
             'email' => $this->email,
             'role' => $this->role,
+            'status' => $this->status,
+            'company_id' => $this->company_id,
             'employee_id' => $this->employee_id,
+            'company' => $this->whenLoaded('company', function () {
+                return [
+                    'id' => $this->company->id,
+                    'name' => $this->company->name,
+                    'slug' => $this->company->slug,
+                    'status' => $this->company->status,
+                ];
+            }),
             // optionally include a minimal employee payload if loaded
             'employee' => $this->whenLoaded('employee', function () {
                 return [
@@ -25,6 +36,7 @@ class UserResource extends JsonResource
                     'department' => $this->employee->department ?? null,
                 ];
             }),
+            'last_login_at' => $this->last_login_at,
             'created_at' => $this->created_at,
         ];
     }
