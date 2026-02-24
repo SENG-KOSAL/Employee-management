@@ -30,14 +30,9 @@ trait BelongsToCompany
             $activeCompany = app(ActiveCompany::class);
             $companyId = $activeCompany->id();
 
-            if ($companyId === null) {
-                // No active company means no tenant data should be returned.
-                $builder->whereRaw('1 = 0');
-
-                return;
+            if ($companyId !== null) {
+                $builder->where($builder->getModel()->getTable() . '.company_id', $companyId);
             }
-
-            $builder->where($builder->getModel()->getTable() . '.company_id', $companyId);
         });
     }
 

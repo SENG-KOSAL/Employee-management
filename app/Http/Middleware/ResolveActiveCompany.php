@@ -37,7 +37,10 @@ class ResolveActiveCompany
         $hostSlug = strtolower((string) strtok($host, '.'));
         $hostCompany = null;
         if ($hostSlug !== '' && ! in_array($hostSlug, ['localhost', '127', '0'], true)) {
-            $hostCompany = Company::query()->active()->where('slug', $hostSlug)->first();
+            $hostCompany = Company::query()
+                ->active()
+                ->whereRaw('LOWER(slug) = ?', [$hostSlug])
+                ->first();
         }
 
         if ($user->isSuperAdmin()) {

@@ -29,6 +29,17 @@ return Application::configure(basePath: dirname(__DIR__))
             'superadmin-readonly' => \App\Http\Middleware\SuperAdminReadOnly::class,
             'audit' => \App\Http\Middleware\AuditTrail::class,
         ]);
+
+        // Tenant-scoped model binding (BelongsToCompany) needs active company set
+        // before SubstituteBindings resolves route-model parameters.
+        $middleware->appendToPriorityList(
+            \Illuminate\Auth\Middleware\Authenticate::class,
+            \App\Http\Middleware\ResolveActiveCompany::class,
+        );
+        $middleware->prependToPriorityList(
+            \Illuminate\Routing\Middleware\SubstituteBindings::class,
+            \App\Http\Middleware\ResolveActiveCompany::class,
+        );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(function (Request $request, \Throwable $e) {
