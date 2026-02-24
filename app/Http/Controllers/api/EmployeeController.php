@@ -7,6 +7,7 @@ use App\Http\Requests\Employee\StoreEmployeeRequest;
 use App\Http\Requests\Employee\UpdateEmployeeRequest;
 use App\Http\Resources\Employee\EmployeeResource;
 use App\Models\Employee;
+use App\Models\EmployeeDocument;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -62,7 +63,7 @@ class EmployeeController extends Controller
         $query->orderBy($sortBy, $sortDir === 'asc' ? 'asc' : 'desc');
 
         $perPage = (int) $request->query('per_page', 15);
-        $employees = $query->paginate($perPage)->withQueryString();
+        $employees = $query->with('document')->paginate($perPage)->withQueryString();
 
         return EmployeeResource::collection($employees);
     }
@@ -94,7 +95,7 @@ class EmployeeController extends Controller
             ]);
 
             // Return employee resource with generated credentials
-            $resource = new EmployeeResource($employee->load('user'));
+            $resource = new EmployeeResource($employee->load(['user', 'document']));
             $response = $resource->toArray(request());
             $response['login_credentials'] = [
                 'email' => $user->email,
@@ -111,7 +112,7 @@ class EmployeeController extends Controller
         if ($user && $user->isEmployee() && $user->employee_id !== $employee->id) {
             abort(403, 'Forbidden');
         }
-        return new EmployeeResource($employee->load('user'));
+        return new EmployeeResource($employee->load(['user', 'document']));
     }
 
     public function update(UpdateEmployeeRequest $request, Employee $employee)
@@ -170,8 +171,91 @@ class EmployeeController extends Controller
                 }
             }
 
-            return new EmployeeResource($employee->load('user'));
+            return new EmployeeResource($employee->load(['user', 'document']));
         });
+    }
+
+    public function uploadDocuments(Request $request, Employee $employee)
+    {
+        $user = $request->user();
+        if ($user && $user->isEmployee() && $user->employee_id !== $employee->id) {
+            abort(403, 'Forbidden');
+        }
+
+        $validated = $request->validate([
+            // multipart/form-data field names expected by frontend
+            'id_card' => ['nullable', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png'],
+            'contract' => ['nullable', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png'],
+            'cv' => ['nullable', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png'],
+            'certificate' => ['nullable', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png'],
+        ]);
+
+        $doc = $employee->document()->first();
+
+        $updates = [];
+
+        if ($request->hasFile('id_card')) {
+            if ($doc?->id_card_file_path) {
+                Storage::disk('public')->delete($doc->id_card_file_path);
+            }
+            $updates['id_card_file_path'] = $this->storeEmployeeDocumentFile($employee, $request->file('id_card'), 'id-card');
+        }
+
+        if ($request->hasFile('contract')) {
+            if ($doc?->contract_file_path) {
+                Storage::disk('public')->delete($doc->contract_file_path);
+            }
+            $updates['contract_file_path'] = $this->storeEmployeeDocumentFile($employee, $request->file('contract'), 'contract');
+        }
+
+        if ($request->hasFile('cv')) {
+            if ($doc?->cv_file_path) {
+                Storage::disk('public')->delete($doc->cv_file_path);
+            }
+            $updates['cv_file_path'] = $this->storeEmployeeDocumentFile($employee, $request->file('cv'), 'cv');
+        }
+
+        if ($request->hasFile('certificate')) {
+            if ($doc?->certificate_file_path) {
+                Storage::disk('public')->delete($doc->certificate_file_path);
+            }
+            $updates['certificate_file_path'] = $this->storeEmployeeDocumentFile($employee, $request->file('certificate'), 'certificate');
+        }
+
+        if (empty($updates)) {
+            abort(422, 'No documents were provided. Use multipart fields: id_card, contract, cv, certificate');
+        }
+
+        EmployeeDocument::query()->updateOrCreate(
+            ['employee_id' => $employee->id],
+            $updates
+        );
+
+        return new EmployeeResource($employee->fresh()->load(['user', 'document']));
+    }
+
+    public function uploadPhoto(Request $request, Employee $employee)
+    {
+        $user = $request->user();
+        if ($user && $user->isEmployee() && $user->employee_id !== $employee->id) {
+            abort(403, 'Forbidden');
+        }
+
+        $validated = $request->validate([
+            'photo' => ['required', 'image', 'max:5120'],
+        ]);
+
+        $file = $validated['photo'];
+
+        if ($employee->photo_path) {
+            Storage::disk('public')->delete($employee->photo_path);
+        }
+
+        $employee->update([
+            'photo_path' => $this->storePhoto($file, $employee->employee_code),
+        ]);
+
+        return new EmployeeResource($employee->fresh()->load('user'));
     }
 
     public function destroy(Employee $employee)
@@ -191,5 +275,14 @@ class EmployeeController extends Controller
         $path = $file->storeAs('employees/' . date('Y'), $filename, ['disk' => 'public']);
         // optionally resize using Intervention Image before storing
         return $path;
+    }
+
+    protected function storeEmployeeDocumentFile(Employee $employee, $file, string $type): string
+    {
+        $ext = $file->getClientOriginalExtension();
+        $filename = sprintf('%s-%s.%s', $type, time(), $ext);
+        $dir = sprintf('employee-documents/%s/%s', date('Y'), $employee->employee_code);
+
+        return $file->storeAs($dir, $filename, ['disk' => 'public']);
     }
 }

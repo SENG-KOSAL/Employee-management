@@ -2,14 +2,17 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Payroll extends Model
 {
     use HasFactory;
+    use BelongsToCompany;
 
     protected $fillable = [
+        'company_id',
         'payroll_run_id',
         'employee_id',
         'period_start',
@@ -53,5 +56,15 @@ class Payroll extends Model
     public function payslip()
     {
         return $this->hasOne(Payslip::class);
+    }
+
+    public function adjustments()
+    {
+        return $this->hasMany(PayrollAdjustment::class);
+    }
+
+    public function auditLogs()
+    {
+        return $this->hasMany(PayrollAuditLog::class);
     }
 }

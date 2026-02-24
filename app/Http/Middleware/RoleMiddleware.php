@@ -15,6 +15,10 @@ class RoleMiddleware
             throw new AccessDeniedHttpException('Unauthenticated.');
         }
 
+        if (method_exists($user, 'isSuperAdmin') && $user->isSuperAdmin()) {
+            return $next($request);
+        }
+
         if (! in_array($user->role, $roles, true)) {
             throw new AccessDeniedHttpException('Forbidden.');
         }

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Storage;
@@ -9,8 +10,10 @@ use Illuminate\Support\Facades\Storage;
 class Employee extends Model
 {
     use HasFactory;
+    use BelongsToCompany;
 
     protected $fillable = [
+        'company_id',
         'employee_code',
         'first_name',
         'last_name',
@@ -29,6 +32,18 @@ class Employee extends Model
         'status',
         'line_manager_id',
         'photo_path',
+
+        // National & legal information
+        'national_id_number',
+        'nssf_number',
+        'passport_number',
+        'work_permit_number',
+        'nationality',
+
+        // Emergency contact
+        'emergency_contact_name',
+        'emergency_contact_phone',
+        'emergency_contact_relationship',
     ];
 
     protected $casts = [
@@ -54,6 +69,11 @@ class Employee extends Model
     public function user()
     {
         return $this->hasOne(User::class, 'employee_id');
+    }
+
+    public function document()
+    {
+        return $this->hasOne(EmployeeDocument::class);
     }
 
     // Self-referential manager relationship

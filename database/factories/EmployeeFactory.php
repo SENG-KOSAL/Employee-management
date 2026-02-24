@@ -12,8 +12,15 @@ class EmployeeFactory extends Factory
 
     public function definition(): array
     {
-        static $count = 1;
-        $code = 'EMP-' . str_pad($count++, 3, '0', STR_PAD_LEFT);
+        $code = $this->faker->unique()->numerify('EMP-#######');
+
+        $nationality = $this->faker->randomElement(['khmer', 'foreign']);
+        $passport = $nationality === 'foreign'
+            ? strtoupper($this->faker->randomLetter) . strtoupper($this->faker->randomLetter) . $this->faker->numerify('#######')
+            : null;
+        $workPermit = $nationality === 'foreign'
+            ? 'WP-' . $this->faker->numerify('########')
+            : null;
 
         return [
             'employee_code' => $code,
@@ -29,6 +36,18 @@ class EmployeeFactory extends Factory
             'start_date' => $this->faker->date(),
             'salary' => $this->faker->randomFloat(2, 300, 10000),
             'status' => $this->faker->randomElement(['active','inactive']),
+
+            // National & legal information
+            'national_id_number' => $nationality === 'khmer' ? $this->faker->numerify('#########') : null,
+            'nssf_number' => 'NSSF-' . $this->faker->numerify('########'),
+            'passport_number' => $passport,
+            'work_permit_number' => $workPermit,
+            'nationality' => $nationality,
+
+            // Emergency contact
+            'emergency_contact_name' => $this->faker->name,
+            'emergency_contact_phone' => $this->faker->phoneNumber,
+            'emergency_contact_relationship' => $this->faker->randomElement(['Father', 'Mother', 'Spouse', 'Sibling', 'Friend']),
         ];
     }
 }

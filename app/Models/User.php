@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Company;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -13,7 +14,7 @@ class User extends Authenticatable
     use HasApiTokens, HasFactory, Notifiable;
     
     // Roles allowed in system
-    public const ROLES = ['admin', 'hr', 'manager', 'employee'];
+    public const ROLES = ['super_admin', 'company_admin', 'admin', 'hr', 'manager', 'employee'];
 
     /**
      * The attributes that are mass assignable.
@@ -22,9 +23,13 @@ class User extends Authenticatable
      */
     protected $fillable = [
         'name',
+        'username',
         'email',
         'password',
         'role',
+        'company_id',
+        'status',
+        'last_login_at',
         'employee_id',
     ];
 
@@ -45,6 +50,7 @@ class User extends Authenticatable
      */
     protected $casts = [
         'email_verified_at' => 'datetime',
+        'last_login_at' => 'datetime',
     ];
 
     /**
@@ -74,12 +80,27 @@ class User extends Authenticatable
         return $this->belongsTo(\App\Models\Employee::class, 'employee_id');
     }
 
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
+    }
+
     /**
      * Role helpers
      */
     public function isAdmin(): bool
     {
-        return $this->role === 'admin';
+        return in_array($this->role, ['super_admin', 'admin', 'company_admin'], true);
+    }
+
+    public function isCompanyAdmin(): bool
+    {
+        return $this->isAdmin();
+    }
+
+    public function isSuperAdmin(): bool
+    {
+        return $this->role === 'super_admin';
     }
 
     public function isHr(): bool
@@ -124,5 +145,15 @@ class User extends Authenticatable
     {
         $this->employee_id = null;
         $this->save();
+    }
+
+    public function scopeActive($query)
+    {
+        return $query->where('status', 'active');
+    }
+
+    public function markLastLogin(): void
+    {
+        $this->forceFill(['last_login_at' => now()])->save();
     }
 }

@@ -12,6 +12,43 @@ class StoreEmployeeRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        if (! $this->has('status')) {
+            return;
+        }
+
+        $status = $this->input('status');
+
+        // Accept booleans / numeric flags from some frontends.
+        if (is_bool($status)) {
+            $status = $status ? 'active' : 'inactive';
+        } elseif (is_numeric($status)) {
+            $status = ((int) $status) === 1 ? 'active' : 'inactive';
+        }
+
+        if (is_string($status)) {
+            $normalized = strtolower(trim($status));
+
+            // Map common synonyms to supported enum values.
+            $map = [
+                'active' => 'active',
+                'inactive' => 'inactive',
+                'disabled' => 'inactive',
+                'suspended' => 'inactive',
+                'terminated' => 'inactive',
+            ];
+
+            if (array_key_exists($normalized, $map)) {
+                $status = $map[$normalized];
+            } else {
+                $status = $normalized;
+            }
+        }
+
+        $this->merge(['status' => $status]);
+    }
+
     public function rules(): array
     {
         return [
@@ -35,6 +72,18 @@ class StoreEmployeeRequest extends FormRequest
             'salary' => 'nullable|numeric|min:0',
             'status' => 'nullable|in:active,inactive',
             'photo' => 'nullable|image|max:4096', // max 4MB
+
+            // National & Legal Information
+            'national_id_number' => 'nullable|string|max:50',
+            'nssf_number' => 'nullable|string|max:50',
+            'passport_number' => 'nullable|string|max:50',
+            'work_permit_number' => 'nullable|string|max:50',
+            'nationality' => 'nullable|in:khmer,foreign',
+
+            // Emergency Contact
+            'emergency_contact_name' => 'nullable|string|max:150',
+            'emergency_contact_phone' => 'nullable|string|max:30',
+            'emergency_contact_relationship' => 'nullable|string|max:50',
         ];
     }
 }

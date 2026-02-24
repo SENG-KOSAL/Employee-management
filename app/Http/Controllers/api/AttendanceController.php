@@ -199,6 +199,84 @@ class AttendanceController extends Controller
         return response()->json($mapped);
     }
 
+    // Admin/HR/Manager adjustment endpoint
+    public function adjust(Request $request, Attendance $attendance)
+    {
+        $user = $request->user();
+        if (! $user) {
+            abort(401, 'Unauthenticated');
+        }
+
+        if (! ($user->isAdmin() || $user->isHr() || $user->isManager())) {
+            abort(403, 'Forbidden');
+        }
+
+        if ($user->isManager()) {
+            $managerEmployee = $user->employee;
+            if (! $managerEmployee) {
+                abort(403, 'No linked employee for manager');
+            }
+
+            $targetEmployee = $attendance->employee;
+            if (! $targetEmployee) {
+                $attendance->load('employee');
+                $targetEmployee = $attendance->employee;
+            }
+
+            if (! $targetEmployee || (int) $targetEmployee->line_manager_id !== (int) $managerEmployee->id) {
+                abort(403, 'Forbidden');
+            }
+        }
+
+        $validated = $request->validate([
+            'check_in' => ['nullable', 'date'],
+            'check_out' => ['nullable', 'date'],
+            'reason' => ['required', 'string', 'max:1000'],
+            // optional override for lateness calculation
+            'shift_start' => ['nullable', 'date'],
+        ]);
+
+        $checkIn = array_key_exists('check_in', $validated)
+            ? ($validated['check_in'] ? Carbon::parse($validated['check_in']) : null)
+            : $attendance->check_in;
+        $checkOut = array_key_exists('check_out', $validated)
+            ? ($validated['check_out'] ? Carbon::parse($validated['check_out']) : null)
+            : $attendance->check_out;
+
+        if ($checkIn && $checkOut && $checkOut->lessThan($checkIn)) {
+            abort(422, 'check_out must be after check_in');
+        }
+
+        $attendance->check_in = $checkIn;
+        $attendance->check_out = $checkOut;
+
+        if ($attendance->check_in && $attendance->check_out) {
+            $duration = $attendance->check_out->floatDiffInHours($attendance->check_in);
+            $attendance->total_hours = round($duration, 2);
+            $attendance->overtime_hours = max(0, (float) $attendance->total_hours - 8);
+        } else {
+            $attendance->total_hours = null;
+            $attendance->overtime_hours = 0;
+        }
+
+        if ($attendance->check_in) {
+            $shiftStart = $request->input('shift_start')
+                ? Carbon::parse($request->input('shift_start'))
+                : $attendance->check_in->copy()->setTime(9, 0);
+            $attendance->is_late = $attendance->check_in->greaterThan($shiftStart);
+        }
+
+        // store reason in notes (append, keep history)
+        $stamp = now()->toIso8601String();
+        $prefix = "[ADJUSTED {$stamp} by user_id={$user->id}] ";
+        $line = $prefix . $validated['reason'];
+        $attendance->notes = $attendance->notes ? ($attendance->notes . "\n" . $line) : $line;
+
+        $attendance->save();
+
+        return new AttendanceResource($attendance->fresh()->load('employee'));
+    }
+
     // Helper: resolve employee for current user; admin/HR may pass employee_id
     protected function resolveEmployee(Request $request, $user): Employee
     {
