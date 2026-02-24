@@ -26,6 +26,10 @@ class CompanyController extends Controller
 
     public function store(Request $request)
     {
+        if ($request->filled('slug')) {
+            $request->merge(['slug' => strtolower((string) $request->input('slug'))]);
+        }
+
         $data = $request->validate([
             'name' => 'required|string|max:255',
             'slug' => 'nullable|string|max:255|unique:companies,slug',
@@ -107,6 +111,10 @@ class CompanyController extends Controller
 
     public function update(Request $request, Company $company)
     {
+        if ($request->filled('slug')) {
+            $request->merge(['slug' => strtolower((string) $request->input('slug'))]);
+        }
+
         $data = $request->validate([
             'name' => 'sometimes|string|max:255',
             'slug' => 'sometimes|string|max:255|unique:companies,slug,' . $company->id,
@@ -195,7 +203,7 @@ class CompanyController extends Controller
             ]);
         }
 
-        if ((string) $data['confirm_slug'] !== (string) $company->slug) {
+        if (strtolower((string) $data['confirm_slug']) !== strtolower((string) $company->slug)) {
             throw ValidationException::withMessages([
                 'confirm_slug' => ['Confirmation slug does not match this company slug.'],
             ]);

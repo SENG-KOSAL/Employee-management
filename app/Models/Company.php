@@ -31,7 +31,24 @@ class Company extends Model
             if (! $company->slug) {
                 $company->slug = Str::slug($company->name);
             }
+
+            if ($company->slug) {
+                $company->slug = strtolower((string) $company->slug);
+            }
         });
+
+        static::updating(function (Company $company) {
+            if ($company->slug) {
+                $company->slug = strtolower((string) $company->slug);
+            }
+        });
+    }
+
+    public function setSlugAttribute($value): void
+    {
+        $this->attributes['slug'] = $value === null
+            ? null
+            : strtolower((string) $value);
     }
 
     public function users()

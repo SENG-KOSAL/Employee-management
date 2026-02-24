@@ -89,7 +89,10 @@ class AuthController extends Controller
                 ], $extra), 403);
             }
 
-            $hostCompany = Company::query()->active()->where('slug', $hostSlug)->first();
+            $hostCompany = Company::query()
+                ->active()
+                ->whereRaw('LOWER(slug) = ?', [$hostSlug])
+                ->first();
             if (! $hostCompany) {
                 Auth::logout();
 
