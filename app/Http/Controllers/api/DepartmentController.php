@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Department;
+use App\Support\ActiveCompany;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -42,8 +43,15 @@ class DepartmentController extends Controller
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
+        $companyId = $this->activeCompanyId($request);
+
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255', 'unique:departments,name'],
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('departments', 'name')->where(fn ($query) => $query->where('company_id', $companyId)),
+            ],
             'description' => ['nullable', 'string'],
             'status' => ['nullable', Rule::in(['active', 'inactive'])],
         ]);
@@ -89,12 +97,16 @@ class DepartmentController extends Controller
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
+        $companyId = $this->activeCompanyId($request);
+
         $validated = $request->validate([
             'name' => [
                 'required',
                 'string',
                 'max:255',
-                Rule::unique('departments', 'name')->ignore($department->id),
+                Rule::unique('departments', 'name')
+                    ->where(fn ($query) => $query->where('company_id', $companyId))
+                    ->ignore($department->id),
             ],
             'description' => ['nullable', 'string'],
             'status' => ['nullable', Rule::in(['active', 'inactive'])],
@@ -148,5 +160,10 @@ class DepartmentController extends Controller
         }
 
         return false;
+    }
+
+    private function activeCompanyId(Request $request): ?int
+    {
+        return app(ActiveCompany::class)->id() ?? $request->user()?->company_id;
     }
 }

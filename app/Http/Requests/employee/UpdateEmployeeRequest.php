@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Employee;
 
+use App\Support\ActiveCompany;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use App\Models\Employee;
@@ -51,6 +52,7 @@ class UpdateEmployeeRequest extends FormRequest
     {
         $employeeParam = $this->route('employee');
         $employeeId = $employeeParam;
+        $activeCompanyId = app(ActiveCompany::class)->id() ?? $this->user()?->company_id;
         $userId = null;
         if ($employeeParam instanceof Employee) {
             $userId = $employeeParam->user?->id;
@@ -61,7 +63,9 @@ class UpdateEmployeeRequest extends FormRequest
                 'required',
                 'string',
                 'max:50',
-                Rule::unique('employees', 'employee_code')->ignore($employeeId),
+                Rule::unique('employees', 'employee_code')
+                    ->where(fn ($query) => $query->where('company_id', $activeCompanyId))
+                    ->ignore($employeeId),
             ],
             'first_name' => 'required|string|max:120',
             'last_name' => 'nullable|string|max:120',

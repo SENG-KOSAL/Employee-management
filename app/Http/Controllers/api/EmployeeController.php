@@ -72,16 +72,40 @@ class EmployeeController extends Controller
     {
         $data = $request->validated();
 
+        $fullName = trim((string) ($data['name'] ?? ''));
+        if (! isset($data['first_name']) || $data['first_name'] === null || $data['first_name'] === '') {
+            [$firstName, $lastName] = $this->splitName($fullName);
+            $data['first_name'] = $firstName;
+            if (! isset($data['last_name']) || $data['last_name'] === null || $data['last_name'] === '') {
+                $data['last_name'] = $lastName;
+            }
+        }
+
+        if (! isset($data['phone']) || $data['phone'] === null || $data['phone'] === '') {
+            $data['phone'] = $data['phone_number'] ?? null;
+        }
+
+        if (! isset($data['start_date']) || $data['start_date'] === null || $data['start_date'] === '') {
+            $data['start_date'] = $data['join_date'] ?? null;
+        }
+
+        if (empty($data['employee_code'])) {
+            $data['employee_code'] = $this->generateEmployeeCode();
+        }
+
         if ($request->hasFile('photo')) {
             $data['photo_path'] = $this->storePhoto($request->file('photo'), $data['employee_code'] ?? Str::random(8));
         }
 
-        // Use provided password from request (validated)
-        $providedPassword = $data['password'];
+        // Use provided password from request, otherwise generate a temporary one.
+        $providedPassword = $data['password'] ?? Str::password(12);
+        $isGeneratedPassword = ! isset($data['password']) || empty($data['password']);
         $userName = $data['name'] ?? null;
         $userRole = $data['role'] ?? 'employee';
 
-        return DB::transaction(function () use ($data, $providedPassword, $userName, $userRole) {
+        unset($data['name'], $data['role'], $data['password'], $data['phone_number'], $data['join_date']);
+
+        return DB::transaction(function () use ($data, $providedPassword, $userName, $userRole, $isGeneratedPassword) {
             // Create employee first
             $employee = Employee::create($data);
 
@@ -91,6 +115,7 @@ class EmployeeController extends Controller
                 'email' => $employee->email,
                 'password' => $providedPassword,
                 'role' => $userRole,
+                'company_id' => $employee->company_id,
                 'employee_id' => $employee->id,
             ]);
 
@@ -99,11 +124,40 @@ class EmployeeController extends Controller
             $response = $resource->toArray(request());
             $response['login_credentials'] = [
                 'email' => $user->email,
-                'message' => 'User account created automatically using provided password.',
+                'message' => $isGeneratedPassword
+                    ? 'User account created automatically using generated temporary password.'
+                    : 'User account created automatically using provided password.',
             ];
+
+            if ($isGeneratedPassword) {
+                $response['login_credentials']['temporary_password'] = $providedPassword;
+            }
 
             return response()->json($response, 201);
         });
+    }
+
+    protected function splitName(string $fullName): array
+    {
+        $fullName = trim($fullName);
+        if ($fullName === '') {
+            return ['N/A', null];
+        }
+
+        $parts = preg_split('/\s+/', $fullName) ?: [];
+        $first = array_shift($parts) ?: 'N/A';
+        $last = ! empty($parts) ? implode(' ', $parts) : null;
+
+        return [$first, $last];
+    }
+
+    protected function generateEmployeeCode(): string
+    {
+        do {
+            $code = 'EMP-' . strtoupper(Str::random(8));
+        } while (Employee::query()->where('employee_code', $code)->exists());
+
+        return $code;
     }
 
     public function show(Employee $employee)
