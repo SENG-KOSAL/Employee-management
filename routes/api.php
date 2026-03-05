@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\DepartmentController;
 use App\Http\Controllers\Api\EmployeeBenefitController;
 use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\EmployeeDeductionController;
+use App\Http\Controllers\Api\EmployeeExcelController;
 use App\Http\Controllers\Api\EmployeeWorkScheduleController;
 use App\Http\Controllers\Api\LeaveAllocationController;
 use App\Http\Controllers\Api\LeaveApprovalController;
@@ -85,6 +86,11 @@ Route::prefix('v1')->group(function () {
 
             Route::post('employees/{employee}/photo', [EmployeeController::class, 'uploadPhoto']);
             Route::match(['post', 'put', 'patch'], 'employees/{employee}/documents', [EmployeeController::class, 'uploadDocuments']);
+
+            Route::prefix('admin/employees')->middleware('role:admin,hr,company_admin')->group(function () {
+                Route::get('template', [EmployeeExcelController::class, 'template']);
+                Route::post('import', [EmployeeExcelController::class, 'import']);
+            });
 
             // Department management (controller enforces role-based access)
             Route::get('departments', [DepartmentController::class, 'index']);
