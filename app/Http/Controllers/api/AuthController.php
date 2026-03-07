@@ -46,7 +46,7 @@ class AuthController extends Controller
 
         // Tenant-domain login enforcement for non-superadmin users.
         // Example: z-company.localhost -> slug "z-company".
-        if (! $user->isSuperAdmin()) {
+        if (! $user->isSuperAdmin() && config('tenancy.strict_tenant_domain', true)) {
             $forwardedHost = $request->header('X-Forwarded-Host')
                 ?: $request->header('X-Original-Host')
                 ?: $request->header('X-Tenant-Host');

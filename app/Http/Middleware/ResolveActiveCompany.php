@@ -11,6 +11,8 @@ use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 
 class ResolveActiveCompany
 {
+    private const TRUE_LIKE_VALUES = ['1', 'true', 'yes', 'on'];
+
     public function handle(Request $request, Closure $next)
     {
         $user = $request->user();
@@ -44,10 +46,17 @@ class ResolveActiveCompany
         }
 
         if ($user->isSuperAdmin()) {
-            // Stateless API: super admin can set context using header.
-            // If header is not provided, try to infer from host (slug).
+            // Stateless API: super admin can set tenant context explicitly.
+            // Host inference is optional and controlled by config/tenancy.php.
             $activeCompanyId = $request->header('X-Active-Company')
                 ?: $request->query('active_company_id');
+
+            $isForcedPlatformContext = false;
+            if (config('tenancy.allow_super_admin_query_override', false)) {
+                $queryKey = (string) config('tenancy.super_admin_query_key', 'sa');
+                $overrideValue = strtolower((string) $request->query($queryKey, ''));
+                $isForcedPlatformContext = in_array($overrideValue, self::TRUE_LIKE_VALUES, true);
+            }
 
             if ($activeCompanyId) {
                 $company = Company::query()->active()->find($activeCompanyId);
@@ -56,7 +65,9 @@ class ResolveActiveCompany
                 }
 
                 $activeCompany->set($company);
-            } elseif ($hostCompany) {
+            } elseif ($isForcedPlatformContext) {
+                $activeCompany->clear();
+            } elseif ($hostCompany && config('tenancy.allow_super_admin_host_inference', false)) {
                 $activeCompany->set($hostCompany);
             } else {
                 $activeCompany->clear();
