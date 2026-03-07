@@ -15,7 +15,8 @@ return [
         // Allow tenant subdomains in local dev, e.g. http://g.localhost:3000
         '#^http://([a-z0-9-]+\.)?localhost:3000$#i',
         '#^http://([a-z0-9-]+\.)?localhost:3001$#i',
-        
+        // Production tenant subdomains
+        '#^https://([a-z0-9-]+\.)?yourapp\.com$#i',
     ],
     'allowed_headers' => ['*'],
     'exposed_headers' => [],
