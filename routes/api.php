@@ -88,6 +88,7 @@ Route::prefix('v1')->group(function () {
             Route::match(['post', 'put', 'patch'], 'employees/{employee}/documents', [EmployeeController::class, 'uploadDocuments']);
 
             Route::prefix('admin/employees')->middleware('role:admin,hr,company_admin')->group(function () {
+                Route::get('export', [EmployeeExcelController::class, 'export']);
                 Route::get('template', [EmployeeExcelController::class, 'template']);
                 Route::post('import', [EmployeeExcelController::class, 'import']);
             });
