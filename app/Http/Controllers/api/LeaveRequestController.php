@@ -7,12 +7,17 @@ use App\Http\Requests\StoreLeaveRequest;
 use App\Http\Resources\LeaveRequestResource;
 use App\Models\LeaveAllocation;
 use App\Models\LeaveRequest;
+use App\Support\AuditLogger;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class LeaveRequestController extends Controller
 {
+    public function __construct(private readonly AuditLogger $auditLogger)
+    {
+    }
+
     public function index(Request $request)
     {
         $user = $request->user();
@@ -108,6 +113,12 @@ class LeaveRequestController extends Controller
         }
 
         $leave = LeaveRequest::create($data);
+
+        $this->auditLogger->log($user, 'leave.requested', $leave, [
+            'domain' => 'leave',
+            'days' => $leave->days,
+            'status' => $leave->status,
+        ], $request);
 
         // Optionally: notify manager/HR via Notification (not included here)
 

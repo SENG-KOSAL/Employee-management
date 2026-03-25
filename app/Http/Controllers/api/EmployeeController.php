@@ -9,6 +9,7 @@ use App\Http\Resources\Employee\EmployeeResource;
 use App\Models\Employee;
 use App\Models\EmployeeDocument;
 use App\Models\User;
+use App\Support\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -17,11 +18,12 @@ use Illuminate\Support\Facades\Hash;
 
 class EmployeeController extends Controller
 {
-    // Optionally use middleware('auth:sanctum') if protected
-    public function __construct()
+    public function __construct(private readonly AuditLogger $auditLogger)
     {
-        // $this->middleware('auth:sanctum');
     }
+
+    // Optionally use middleware('auth:sanctum') if protected
+    // public function __construct() { }
 
     public function index(Request $request)
     {
@@ -105,7 +107,7 @@ class EmployeeController extends Controller
 
         unset($data['name'], $data['role'], $data['password'], $data['phone_number'], $data['join_date']);
 
-        return DB::transaction(function () use ($data, $providedPassword, $userName, $userRole, $isGeneratedPassword) {
+        return DB::transaction(function () use ($data, $providedPassword, $userName, $userRole, $isGeneratedPassword, $request) {
             // Create employee first
             $employee = Employee::create($data);
 
@@ -132,6 +134,11 @@ class EmployeeController extends Controller
             if ($isGeneratedPassword) {
                 $response['login_credentials']['temporary_password'] = $providedPassword;
             }
+
+            $this->auditLogger->log($request->user(), 'employee.created', $employee, [
+                'domain' => 'employee',
+                'fields' => array_keys($employee->getAttributes()),
+            ], $request);
 
             return response()->json($response, 201);
         });
@@ -199,7 +206,8 @@ class EmployeeController extends Controller
             $data['photo_path'] = $this->storePhoto($request->file('photo'), $data['employee_code'] ?? $employee->employee_code);
         }
 
-        return DB::transaction(function () use ($employee, $data, $userData) {
+        return DB::transaction(function () use ($employee, $data, $userData, $request) {
+            $before = $employee->getOriginal();
             $employee->update($data);
 
             // Keep linked user in sync (if exists)
@@ -224,6 +232,12 @@ class EmployeeController extends Controller
                     $user->update($userData);
                 }
             }
+
+            $this->auditLogger->log($request->user(), 'employee.updated', $employee, [
+                'domain' => 'employee',
+                'before' => $before,
+                'after' => $employee->fresh()->getAttributes(),
+            ], $request);
 
             return new EmployeeResource($employee->load(['user', 'document']));
         });
@@ -314,10 +328,18 @@ class EmployeeController extends Controller
 
     public function destroy(Employee $employee)
     {
+        $request = request();
+        $before = $employee->toArray();
+
         if ($employee->photo_path) {
             Storage::disk('public')->delete($employee->photo_path);
         }
         $employee->delete();
+
+        $this->auditLogger->log($request->user(), 'employee.deleted', null, [
+            'domain' => 'employee',
+            'employee' => $before,
+        ], $request);
 
         return response()->noContent();
     }

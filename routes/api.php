@@ -2,8 +2,11 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\AttendanceController;
+use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\DepartmentController;
+use App\Http\Controllers\Api\EmployeeAuditController;
 use App\Http\Controllers\Api\EmployeeBenefitController;
+use App\Http\Controllers\Api\EmployeeBulkActionController;
 use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\EmployeeDeductionController;
 use App\Http\Controllers\Api\EmployeeExcelController;
@@ -13,12 +16,17 @@ use App\Http\Controllers\Api\LeaveApprovalController;
 use App\Http\Controllers\Api\LeaveRequestController;
 use App\Http\Controllers\Api\LeaveTypeController;
 use App\Http\Controllers\Api\OvertimeController;
+use App\Http\Controllers\Api\PayrollGovernanceController;
 use App\Http\Controllers\Api\PayrollRunController;
+use App\Http\Controllers\Api\PayslipController;
 use App\Http\Controllers\Api\PermissionController;
+use App\Http\Controllers\Api\ReportingController;
 use App\Http\Controllers\Api\RolePermissionController;
 use App\Http\Controllers\Api\SalaryController;
+use App\Http\Controllers\Api\ScheduledReportController;
 use App\Http\Controllers\Api\WorkScheduleController;
 use App\Http\Controllers\Api\TenantContextController;
+use App\Http\Controllers\Api\UserNotificationController;
 use App\Http\Controllers\Api\Platform\CompanyController as PlatformCompanyController;
 use App\Http\Controllers\Api\Platform\ContextController;
 use App\Http\Controllers\Api\Platform\ModuleFlagController;
@@ -83,6 +91,8 @@ Route::prefix('v1')->group(function () {
             // Protected routes (admin/hr/manager; further checks in controllers)
             Route::post('users', [AuthController::class, 'createUser'])->middleware('can:create-user');
             Route::apiResource('employees', EmployeeController::class);
+            Route::post('employees/bulk-actions', [EmployeeBulkActionController::class, 'handle'])->middleware('role:admin,hr,company_admin');
+            Route::get('employees/{employee}/audit-trail', [EmployeeAuditController::class, 'index']);
 
             Route::post('employees/{employee}/photo', [EmployeeController::class, 'uploadPhoto']);
             Route::match(['post', 'put', 'patch'], 'employees/{employee}/documents', [EmployeeController::class, 'uploadDocuments']);
@@ -121,7 +131,41 @@ Route::prefix('v1')->group(function () {
             Route::patch('payrolls/{payroll}', [\App\Http\Controllers\Api\PayrollController::class, 'update'])->middleware('role:admin,hr,company_admin');
             Route::get('payrolls/{payroll}/adjustments', [\App\Http\Controllers\Api\PayrollController::class, 'listAdjustments'])->middleware('role:admin,hr,company_admin');
             Route::post('payrolls/{payroll}/adjustments', [\App\Http\Controllers\Api\PayrollController::class, 'createAdjustment'])->middleware('role:admin,hr,company_admin');
+            Route::post('payrolls/{payroll}/adjustments/{adjustment}/approve', [PayrollGovernanceController::class, 'approveAdjustment'])->middleware('role:admin,hr,company_admin');
+            Route::post('payrolls/{payroll}/adjustments/{adjustment}/reject', [PayrollGovernanceController::class, 'rejectAdjustment'])->middleware('role:admin,hr,company_admin');
             Route::post('payrolls/{payroll}/mark-paid', [\App\Http\Controllers\Api\PayrollController::class, 'markPaid'])->middleware('role:admin,hr,company_admin');
+
+            // payslip generation and distribution
+            Route::post('payrolls/{payroll}/payslip/generate', [PayslipController::class, 'generate'])->middleware('role:admin,hr,company_admin');
+            Route::post('payrolls/payslips/generate-batch', [PayslipController::class, 'generateBatch'])->middleware('role:admin,hr,company_admin');
+            Route::post('payrolls/{payroll}/payslip/distribute', [PayslipController::class, 'distribute'])->middleware('role:admin,hr,company_admin');
+            Route::get('payrolls/{payroll}/payslip/download', [PayslipController::class, 'download']);
+
+            // payroll governance
+            Route::get('payroll-period-locks', [PayrollGovernanceController::class, 'listLocks'])->middleware('role:admin,hr,company_admin');
+            Route::post('payroll-periods/lock', [PayrollGovernanceController::class, 'lockPeriod'])->middleware('role:admin,hr,company_admin');
+            Route::post('payroll-periods/unlock', [PayrollGovernanceController::class, 'unlockPeriod'])->middleware('role:admin,hr,company_admin');
+
+            // reporting and analytics
+            Route::get('reports/summary', [ReportingController::class, 'summary'])->middleware('role:admin,hr,manager,company_admin');
+            Route::get('reports/drilldown/employees', [ReportingController::class, 'drilldownEmployees'])->middleware('role:admin,hr,manager,company_admin');
+            Route::get('reports/drilldown/leaves', [ReportingController::class, 'drilldownLeaves'])->middleware('role:admin,hr,manager,company_admin');
+            Route::get('reports/drilldown/payrolls', [ReportingController::class, 'drilldownPayrolls'])->middleware('role:admin,hr,manager,company_admin');
+            Route::get('reports/export', [ReportingController::class, 'export'])->middleware('role:admin,hr,manager,company_admin');
+
+            // scheduled reports
+            Route::get('scheduled-reports', [ScheduledReportController::class, 'index'])->middleware('role:admin,hr,company_admin');
+            Route::post('scheduled-reports', [ScheduledReportController::class, 'store'])->middleware('role:admin,hr,company_admin');
+            Route::get('scheduled-reports/{scheduled_report}', [ScheduledReportController::class, 'show'])->middleware('role:admin,hr,company_admin');
+            Route::patch('scheduled-reports/{scheduled_report}', [ScheduledReportController::class, 'update'])->middleware('role:admin,hr,company_admin');
+            Route::delete('scheduled-reports/{scheduled_report}', [ScheduledReportController::class, 'destroy'])->middleware('role:admin,hr,company_admin');
+            Route::post('scheduled-reports/{scheduled_report}/run-now', [ScheduledReportController::class, 'runNow'])->middleware('role:admin,hr,company_admin');
+
+            // audit and notifications
+            Route::get('audit-logs', [AuditLogController::class, 'index'])->middleware('role:admin,hr,manager,company_admin');
+            Route::get('notifications/unread', [UserNotificationController::class, 'unread']);
+            Route::post('notifications/{notificationId}/read', [UserNotificationController::class, 'markAsRead']);
+            Route::post('notifications/read-all', [UserNotificationController::class, 'markAllAsRead']);
 
             // payroll runs
             Route::get('payroll-runs', [PayrollRunController::class, 'index'])->middleware('role:admin,hr,company_admin');

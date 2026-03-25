@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Employee;
 use App\Models\Payroll;
+use App\Support\AuditLogger;
+use App\Support\PayrollGovernanceService;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
 use Illuminate\Http\Request;
@@ -12,6 +14,12 @@ use Illuminate\Support\Facades\DB;
 
 class PayrollController extends Controller
 {
+    public function __construct(
+        private readonly PayrollGovernanceService $governance,
+        private readonly AuditLogger $auditLogger,
+    ) {
+    }
+
     public function index(Request $request)
     {
         $user = $request->user();
@@ -115,6 +123,12 @@ class PayrollController extends Controller
                 ],
             ]);
 
+            $this->auditLogger->log($user, 'payroll.updated', $payroll, [
+                'domain' => 'payroll',
+                'before' => $before,
+                'after' => $after,
+            ], request());
+
             return $payroll->fresh(['employee', 'adjustments', 'auditLogs.user']);
         });
     }
@@ -126,7 +140,7 @@ class PayrollController extends Controller
             abort(403, 'Forbidden');
         }
 
-        return $payroll->adjustments()->orderByDesc('created_at')->get();
+        return $payroll->adjustments()->with(['requester', 'approver', 'rejecter'])->orderByDesc('created_at')->get();
     }
 
     public function createAdjustment(Request $request, Payroll $payroll)
@@ -140,65 +154,51 @@ class PayrollController extends Controller
             abort(422, 'Adjustments are allowed only for approved or paid payrolls');
         }
 
+        if ($this->governance->isLocked($payroll)) {
+            abort(422, 'Payroll period is locked');
+        }
+
         $data = $request->validate([
             'kind' => 'required|in:earning,deduction',
             'amount' => 'required|numeric|min:0.01',
             'description' => 'nullable|string|max:255',
         ]);
 
-        $trackedFields = [
-            'benefits_total',
-            'deductions_total',
-            'gross_pay',
-            'net_pay',
-        ];
-
-        return DB::transaction(function () use ($payroll, $data, $user, $trackedFields) {
-            $before = $payroll->only($trackedFields);
-
+        return DB::transaction(function () use ($payroll, $data, $user, $request) {
             $adjustment = $payroll->adjustments()->create([
                 'kind' => $data['kind'],
                 'amount' => $data['amount'],
                 'description' => $data['description'] ?? null,
                 'created_by' => $user->id,
+                'requested_by' => $user->id,
+                'status' => 'pending',
             ]);
+            $flags = $this->governance->evaluateExceptionFlags($payroll, $adjustment);
 
-            $amount = (float) $adjustment->amount;
-            if ($adjustment->kind === 'earning') {
-                $payroll->benefits_total = (float) $payroll->benefits_total + $amount;
-            } else {
-                $payroll->deductions_total = (float) $payroll->deductions_total + $amount;
-            }
-
-            $basePay = (float) $payroll->base_pay;
-            $overtimePay = (float) $payroll->overtime_pay;
-            $benefitsTotal = (float) $payroll->benefits_total;
-            $deductionsTotal = (float) $payroll->deductions_total;
-            $unpaidLeaveDeduction = (float) $payroll->unpaid_leave_deduction;
-
-            $grossPay = $basePay + $overtimePay + $benefitsTotal;
-            $netPay = $grossPay - $deductionsTotal - $unpaidLeaveDeduction;
-
-            $payroll->gross_pay = $grossPay;
-            $payroll->net_pay = $netPay;
-            $payroll->save();
-
-            $after = $payroll->fresh()->only($trackedFields);
+            $adjustment->update([
+                'exception_flags' => $flags,
+            ]);
 
             $payroll->auditLogs()->create([
                 'user_id' => $user->id,
-                'action' => 'adjustment_created',
+                'action' => 'adjustment_requested',
                 'changes' => [
-                    'adjustment' => $adjustment->only(['id', 'kind', 'amount', 'description']),
-                    'before' => $before,
-                    'after' => $after,
+                    'adjustment' => $adjustment->only(['id', 'kind', 'amount', 'description', 'status']),
+                    'exception_flags' => $flags,
                 ],
             ]);
 
+            $this->auditLogger->log($user, 'payroll.adjustment_requested', $payroll, [
+                'domain' => 'payroll',
+                'adjustment_id' => $adjustment->id,
+                'exception_flags' => $flags,
+            ], $request);
+
             return response()->json([
-                'payroll' => $payroll->fresh(['employee', 'adjustments']),
-                'adjustment' => $adjustment->fresh(['creator']),
-            ], 201);
+                'payroll' => $payroll->fresh(['employee', 'adjustments.requester']),
+                'adjustment' => $adjustment->fresh(['creator', 'requester']),
+                'requires_checker_approval' => true,
+            ], 202);
         });
     }
 
@@ -283,6 +283,12 @@ class PayrollController extends Controller
             );
         });
 
+        $this->auditLogger->log($user, 'payroll.generated', $payroll, [
+            'domain' => 'payroll',
+            'period_start' => $payload['period_start'],
+            'period_end' => $payload['period_end'],
+        ], $request);
+
         return response()->json($payroll->fresh(['employee']), 201);
     }
 
@@ -304,6 +310,11 @@ class PayrollController extends Controller
             $payroll->notes = $data['notes'];
         }
         $payroll->save();
+
+        $this->auditLogger->log($user, 'payroll.mark_paid', $payroll, [
+            'domain' => 'payroll',
+            'paid_at' => $payroll->paid_at,
+        ], $request);
 
         return $payroll->fresh(['employee']);
     }
