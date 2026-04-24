@@ -78,3 +78,108 @@ php artisan db:seed --class=UserSeeder
 
 
 and all users are created instantly.
+
+
+
+
+Backend Setup Guide – Employee Management System (Laravel)
+1. Requirements
+
+Make sure the machine has:
+
+PHP ≥ 8.1
+
+Composer
+
+PostgreSQL (or your preferred database)
+
+Git
+
+2. Clone the Repository
+git clone https://github.com/yourusername/your-backend.git
+cd your-backend
+3. Environment Setup
+
+Copy the example environment file:
+
+cp .env.example .env
+
+Open .env and update your database and app credentials:
+
+DB_CONNECTION=pgsql
+DB_HOST=127.0.0.1
+DB_PORT=5432
+DB_DATABASE=your_database
+DB_USERNAME=your_user
+DB_PASSWORD=your_password
+4. Install Dependencies
+composer install
+5. Generate Application Key
+php artisan key:generate
+
+This creates the APP_KEY in .env
+
+Required for encryption, sessions, and secure data
+
+6. Setup Database
+
+Run migrations to create tables:
+
+php artisan migrate
+
+Seed default data (admin user, roles, etc.):
+
+php artisan db:seed
+
+Or combine both in one command:
+
+php artisan migrate --seed
+
+After this, your database is ready to use.
+
+7. Optimize Laravel
+php artisan optimize
+
+Improves performance by caching config, routes, and views
+
+8. Run Backend Server
+php artisan serve
+
+Backend will run at http://127.0.0.1:8000
+
+9. Optional: Automate Full Setup
+
+You can create a setup.sh script for one-command setup on a new machine:
+
+#!/bin/bash
+cp .env.example .env
+composer install
+php artisan key:generate
+php artisan migrate --seed
+php artisan optimize
+
+Run it with:
+
+bash setup.sh
+
+✅ Everything is ready automatically.
+
+10. Optional: Using Docker
+
+If using Docker, run everything with:
+
+docker-compose up -d
+
+PHP, Laravel, and PostgreSQL run inside containers
+
+No manual installation needed
+
+11. Backup & Maintenance Tips
+
+Daily backup:
+
+pg_dump -U username -h localhost your_database > backup_$(date +%F).sql
+
+Use pagination in APIs and archive old data for large tables
+
+Monitor logs and performance to keep backend fast

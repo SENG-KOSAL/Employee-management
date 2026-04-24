@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\ApproveLeaveRequest;
 use App\Models\LeaveAllocation;
 use App\Models\LeaveRequest;
+use App\Notifications\LeaveDecisionNotification;
+use App\Support\AuditLogger;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -13,6 +15,10 @@ use Illuminate\Support\Facades\Gate;
 
 class LeaveApprovalController extends Controller
 {
+    public function __construct(private readonly AuditLogger $auditLogger)
+    {
+    }
+
     public function decide(ApproveLeaveRequest $request, LeaveRequest $leaveRequest)
     {
         $user = $request->user();
@@ -97,6 +103,21 @@ class LeaveApprovalController extends Controller
                 $leaveRequest->decided_at = Carbon::now();
                 $leaveRequest->save();
             }
+
+            $employeeUser = $leaveRequest->employee?->user;
+            if ($employeeUser) {
+                $employeeUser->notify(new LeaveDecisionNotification(
+                    $action === 'approve' ? 'approved' : 'rejected',
+                    optional($leaveRequest->start_date)->format('Y-m-d') ?? '',
+                    optional($leaveRequest->end_date)->format('Y-m-d') ?? ''
+                ));
+            }
+
+            $this->auditLogger->log($user, 'leave.decision', $leaveRequest, [
+                'domain' => 'leave',
+                'decision' => $action === 'approve' ? 'approved' : 'rejected',
+                'approver_notes' => $approverNotes,
+            ], request());
         });
 
         return new \App\Http\Resources\LeaveRequestResource($leaveRequest->fresh()->load(['employee', 'leaveType', 'approver']));

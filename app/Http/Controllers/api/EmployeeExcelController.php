@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Exports\EmployeesExport;
 use App\Exports\EmployeesTemplateExport;
 use App\Http\Controllers\Controller;
 use App\Imports\EmployeeDynamicImport;
@@ -14,6 +15,22 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class EmployeeExcelController extends Controller
 {
+    public function export(Request $request, ActiveCompany $activeCompany): BinaryFileResponse|JsonResponse
+    {
+        $companyId = $activeCompany->id() ?? $request->user()?->company_id;
+
+        if (! $companyId) {
+            return response()->json([
+                'message' => 'Active company is required for employee export.',
+            ], 422);
+        }
+
+        $filters = $request->only(['department', 'position', 'status']);
+        $filename = 'employees-' . $companyId . '-' . now()->format('Ymd_His') . '.xlsx';
+
+        return Excel::download(new EmployeesExport((int) $companyId, $filters), $filename);
+    }
+
     public function template(EmployeeImportSchema $schemaReader): BinaryFileResponse
     {
         $columns = $schemaReader->importableColumns();

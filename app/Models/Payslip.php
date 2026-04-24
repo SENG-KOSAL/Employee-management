@@ -16,10 +16,16 @@ class Payslip extends Model
         'payroll_id',
         'file_path',
         'generated_at',
+        'delivery_status',
+        'delivery_channel',
+        'delivered_at',
+        'emailed_to',
+        'last_error',
     ];
 
     protected $casts = [
         'generated_at' => 'datetime',
+        'delivered_at' => 'datetime',
     ];
 
     public function payroll()
