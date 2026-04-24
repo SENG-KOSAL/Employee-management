@@ -13,8 +13,11 @@ class PayrollRun extends Model
 
     protected $fillable = [
         'company_id',
+        'month',
+        'year',
         'period_start',
         'period_end',
+        'payment_date',
         'status',
         'created_by',
         'approved_by',
@@ -23,8 +26,11 @@ class PayrollRun extends Model
     ];
 
     protected $casts = [
+        'month' => 'integer',
+        'year' => 'integer',
         'period_start' => 'date',
         'period_end' => 'date',
+        'payment_date' => 'date',
         'paid_at' => 'date',
     ];
 

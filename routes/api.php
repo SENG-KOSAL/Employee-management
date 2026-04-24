@@ -143,6 +143,11 @@ Route::prefix('v1')->group(function () {
 
             // payroll governance
             Route::get('payroll-period-locks', [PayrollGovernanceController::class, 'listLocks'])->middleware('role:admin,hr,company_admin');
+            Route::get('payroll-periods', [PayrollGovernanceController::class, 'listPeriods'])->middleware('role:admin,hr,company_admin');
+            Route::post('payroll-periods', [PayrollGovernanceController::class, 'createPeriod'])->middleware('role:admin,hr,company_admin');
+            Route::put('payroll-periods/{id}', [PayrollGovernanceController::class, 'updatePeriod'])->middleware('role:admin,hr,company_admin');
+            Route::delete('payroll-periods/{id}', [PayrollGovernanceController::class, 'deletePeriod'])->middleware('role:admin,hr,company_admin');
+            Route::patch('payroll-periods/{id}/lock', [PayrollGovernanceController::class, 'lockPayrollPeriod'])->middleware('role:admin,hr,company_admin');
             Route::post('payroll-periods/lock', [PayrollGovernanceController::class, 'lockPeriod'])->middleware('role:admin,hr,company_admin');
             Route::post('payroll-periods/unlock', [PayrollGovernanceController::class, 'unlockPeriod'])->middleware('role:admin,hr,company_admin');
 

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Payroll;
 use App\Models\PayrollAdjustment;
+use App\Models\PayrollPeriod;
 use App\Models\PayrollPeriodLock;
 use App\Support\AuditLogger;
 use App\Support\PayrollGovernanceService;
@@ -45,6 +46,136 @@ class PayrollGovernanceController extends Controller
         ], $request);
 
         return response()->json($lock);
+    }
+
+    public function listPeriods(Request $request)
+    {
+        $this->authorizeAdminHr($request);
+
+        return response()->json(
+            PayrollPeriod::query()
+                ->with(['creator', 'locker'])
+                ->orderByDesc('start_date')
+                ->paginate((int) $request->query('per_page', 20))
+                ->withQueryString()
+        );
+    }
+
+    public function createPeriod(Request $request)
+    {
+        $this->authorizeAdminHr($request);
+
+        $data = $request->validate([
+            'start_date' => 'required|date',
+            'end_date' => 'required|date|after:start_date',
+            'payment_date' => 'required|date|after_or_equal:end_date',
+        ]);
+
+        $this->ensureNoPeriodOverlap($data['start_date'], $data['end_date']);
+
+        $period = PayrollPeriod::create([
+            'start_date' => $data['start_date'],
+            'end_date' => $data['end_date'],
+            'payment_date' => $data['payment_date'],
+            'is_locked' => false,
+            'created_by' => $request->user()->id,
+        ]);
+
+        $this->auditLogger->log($request->user(), 'payroll.period_created', null, [
+            'domain' => 'payroll',
+            'payroll_period_id' => $period->id,
+            'start_date' => $period->start_date?->toDateString(),
+            'end_date' => $period->end_date?->toDateString(),
+            'payment_date' => $period->payment_date?->toDateString(),
+        ], $request);
+
+        return response()->json($period->fresh(['creator', 'locker']), 201);
+    }
+
+    public function updatePeriod(Request $request, int $id)
+    {
+        $this->authorizeAdminHr($request);
+
+        $period = PayrollPeriod::query()->findOrFail($id);
+
+        $data = $request->validate([
+            'start_date' => 'sometimes|required|date',
+            'end_date' => 'sometimes|required|date',
+            'payment_date' => 'sometimes|required|date',
+        ]);
+
+        $startDate = $data['start_date'] ?? $period->start_date?->toDateString();
+        $endDate = $data['end_date'] ?? $period->end_date?->toDateString();
+        $paymentDate = $data['payment_date'] ?? $period->payment_date?->toDateString();
+
+        if ($endDate <= $startDate) {
+            return response()->json([
+                'message' => 'The end_date must be after start_date.',
+            ], 422);
+        }
+
+        if ($paymentDate < $endDate) {
+            return response()->json([
+                'message' => 'The payment_date must be after or equal to end_date.',
+            ], 422);
+        }
+
+        $this->ensureNoPeriodOverlap($startDate, $endDate, $period->id);
+
+        $period->update([
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+            'payment_date' => $paymentDate,
+        ]);
+
+        $this->auditLogger->log($request->user(), 'payroll.period_updated', null, [
+            'domain' => 'payroll',
+            'payroll_period_id' => $period->id,
+            'start_date' => $period->start_date?->toDateString(),
+            'end_date' => $period->end_date?->toDateString(),
+            'payment_date' => $period->payment_date?->toDateString(),
+        ], $request);
+
+        return response()->json($period->fresh(['creator', 'locker']));
+    }
+
+    public function deletePeriod(Request $request, int $id)
+    {
+        $this->authorizeAdminHr($request);
+
+        $period = PayrollPeriod::query()->findOrFail($id);
+        $period->delete();
+
+        $this->auditLogger->log($request->user(), 'payroll.period_deleted', null, [
+            'domain' => 'payroll',
+            'payroll_period_id' => $period->id,
+            'start_date' => $period->start_date?->toDateString(),
+            'end_date' => $period->end_date?->toDateString(),
+        ], $request);
+
+        return response()->json(['message' => 'Payroll period deleted']);
+    }
+
+    public function lockPayrollPeriod(Request $request, int $id)
+    {
+        $this->authorizeAdminHr($request);
+
+        $period = PayrollPeriod::query()->findOrFail($id);
+
+        $period->update([
+            'is_locked' => true,
+            'locked_at' => now(),
+            'locked_by' => $request->user()->id,
+        ]);
+
+        $this->auditLogger->log($request->user(), 'payroll.period_locked', null, [
+            'domain' => 'payroll',
+            'payroll_period_id' => $period->id,
+            'start_date' => $period->start_date?->toDateString(),
+            'end_date' => $period->end_date?->toDateString(),
+        ], $request);
+
+        return response()->json($period->fresh(['creator', 'locker']));
     }
 
     public function unlockPeriod(Request $request)
@@ -211,6 +342,21 @@ class PayrollGovernanceController extends Controller
         $user = $request->user();
         if (! ($user->isAdmin() || $user->isHr())) {
             abort(403, 'Forbidden');
+        }
+    }
+
+    private function ensureNoPeriodOverlap(string $startDate, string $endDate, ?int $ignoreId = null): void
+    {
+        $query = PayrollPeriod::query()
+            ->whereDate('start_date', '<=', $endDate)
+            ->whereDate('end_date', '>=', $startDate);
+
+        if ($ignoreId !== null) {
+            $query->where('id', '!=', $ignoreId);
+        }
+
+        if ($query->exists()) {
+            abort(422, 'Payroll period overlaps with an existing period');
         }
     }
 }

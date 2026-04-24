@@ -8,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasTable('employees')) {
+            return;
+        }
+
         Schema::create('employees', function (Blueprint $table) {
             $table->id();
             $table->string('employee_code', 50)->unique();
@@ -36,6 +40,10 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (! Schema::hasTable('employees')) {
+            return;
+        }
+
         Schema::table('employees', function (Blueprint $table) {
             if (Schema::hasColumn('employees', 'line_manager_id')) {
                 $table->dropForeign(['line_manager_id']);
