@@ -61,11 +61,22 @@ class PayrollRunController extends Controller
         $data = $request->validate([
             'month' => 'required|integer|min:1|max:12',
             'year' => 'required|integer|min:2000|max:2100',
+            'payment_date' => 'nullable|date',
             'notes' => 'nullable|string',
         ]);
 
         $periodStart = Carbon::createFromDate((int) $data['year'], (int) $data['month'], 1)->startOfDay();
         $periodEnd = $periodStart->copy()->endOfMonth();
+        $periodEndDate = $periodEnd->copy()->startOfDay();
+        $paymentDate = isset($data['payment_date'])
+            ? Carbon::parse($data['payment_date'])->startOfDay()
+            : $periodEndDate->copy();
+
+        if ($paymentDate->lt($periodEndDate)) {
+            return response()->json([
+                'message' => 'The payment_date must be after or equal to period_end.',
+            ], 422);
+        }
 
         $run = PayrollRun::updateOrCreate(
             [
@@ -73,6 +84,9 @@ class PayrollRunController extends Controller
                 'period_end' => $periodEnd->toDateString(),
             ],
             [
+                'month' => (int) $data['month'],
+                'year' => (int) $data['year'],
+                'payment_date' => $paymentDate->toDateString(),
                 'status' => 'draft',
                 'created_by' => $user->id,
                 'notes' => $data['notes'] ?? null,
